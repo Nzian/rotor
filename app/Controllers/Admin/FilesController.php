@@ -2,9 +2,9 @@
 
 namespace App\Controllers\Admin;
 
-use App\Classes\Request;
 use App\Classes\Validator;
 use App\Models\User;
+use Illuminate\Http\Request;
 
 class FilesController extends AdminController
 {
@@ -22,8 +22,9 @@ class FilesController extends AdminController
             abort(403, 'Доступ запрещен!');
         }
 
-        $this->file = ltrim(check(Request::input('file')), '/');
-        $this->path = rtrim(check(Request::input('path')), '/');
+        $request    = Request::createFromGlobals();
+        $this->file = ltrim(check($request->input('file')), '/');
+        $this->path = rtrim(check($request->input('path')), '/');
 
         if (
             ! file_exists(RESOURCES . '/views/' . $this->path) ||
@@ -38,28 +39,39 @@ class FilesController extends AdminController
 
     /**
      * Главная страница
+     *
+     * @return string
      */
-    public function index()
+    public function index(): string
     {
         $path  = $this->path;
-        $files = preg_grep('/^([^.])/', scandir(RESOURCES . '/views/' . $path . $this->file));
+        $elements = preg_grep('/^([^.])/', scandir(RESOURCES . '/views/' . $path . $this->file, SCANDIR_SORT_ASCENDING));
 
-        usort($files, function($a, $b) use ($path) {
-            if (is_file(RESOURCES . '/views/' . $path . '/' . $a) && is_file(RESOURCES . '/views/' . $path . '/' . $b)) {
-                return 0;
+        $folders = [];
+        $files   = [];
+
+        foreach ($elements as $element) {
+            if (is_dir(RESOURCES . '/views/' . $path . '/' . $element)) {
+                $folders[] = $element;
+            } else {
+                $files[] = $element;
             }
-            return is_dir(RESOURCES . '/views/' . $path . '/' . $a) ? -1 : 1;
-        });
+        }
+
+        $files = array_merge($folders, $files);
 
         $directories = explode('/', $path);
 
-        return view('admin/files/index',compact('files', 'path', 'directories'));
+        return view('admin/files/index', compact('files', 'path', 'directories'));
     }
 
     /**
      * Редактирование файла
+     *
+     * @param Request $request
+     * @return string
      */
-    public function edit()
+    public function edit(Request $request): string
     {
         $fileName = $this->path ? '/' . $this->file : $this->file;
 
@@ -75,11 +87,11 @@ class FilesController extends AdminController
             abort('default', 'Файл недоступен для записи!');
         }
 
-        if (Request::isMethod('post')) {
-            $token = check(Request::input('token'));
-            $msg   = Request::input('msg');
+        if ($request->isMethod('post')) {
+            $token = check($request->input('token'));
+            $msg   = $request->input('msg');
 
-            if ($token == $_SESSION['token']) {
+            if ($token === $_SESSION['token']) {
 
                 file_put_contents(RESOURCES . '/views/' . $this->path . $fileName . '.blade.php', $msg);
 
@@ -87,7 +99,7 @@ class FilesController extends AdminController
                 redirect ('/admin/files/edit?path=' . $this->path . '&file=' . $this->file);
 
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', 'Неверный идентификатор сессии, повторите действие!');
             }
         }
@@ -99,22 +111,25 @@ class FilesController extends AdminController
 
     /**
      * Создание файла
+     *
+     * @param Request   $request
+     * @param Validator $validator
+     * @return string
      */
-    public function create()
+    public function create(Request $request, Validator $validator): string
     {
         if (! is_writable(RESOURCES . '/views/' . $this->path)) {
             abort('default', 'Директория ' . $this->path . ' недоступна для записи!');
         }
 
-        if (Request::isMethod('post')) {
-            $token    = check(Request::input('token'));
-            $filename = check(Request::input('filename'));
-            $dirname  = check(Request::input('dirname'));
+        if ($request->isMethod('post')) {
+            $token    = check($request->input('token'));
+            $filename = check($request->input('filename'));
+            $dirname  = check($request->input('dirname'));
 
             $fileName = $this->path ? '/' . $filename : $filename;
             $dirName  = $this->path ? '/' . $dirname : $dirname;
 
-            $validator = new Validator();
             $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!');
 
             if ($filename) {
@@ -147,7 +162,7 @@ class FilesController extends AdminController
                 }
 
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }
@@ -157,21 +172,24 @@ class FilesController extends AdminController
 
     /**
      * Удаление файла
+     *
+     * @param Request   $request
+     * @param Validator $validator
+     * @return void
      */
-    public function delete()
+    public function delete(Request $request, Validator $validator): void
     {
         if (! is_writable(RESOURCES . '/views/' . $this->path)) {
             abort('default', 'Директория ' . $this->path . ' недоступна для записи!');
         }
 
-        $token    = check(Request::input('token'));
-        $filename = check(Request::input('filename'));
-        $dirname  = check(Request::input('dirname'));
+        $token    = check($request->input('token'));
+        $filename = check($request->input('filename'));
+        $dirname  = check($request->input('dirname'));
 
         $fileName = $this->path ? '/' . $filename : $filename;
         $dirName  = $this->path ? '/' . $dirname : $dirname;
 
-        $validator = new Validator();
         $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!');
 
         if ($filename) {

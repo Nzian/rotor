@@ -2,10 +2,10 @@
 
 namespace App\Controllers\Admin;
 
-use App\Classes\Request;
 use App\Classes\Validator;
 use App\Models\RekUser;
 use App\Models\User;
+use Illuminate\Http\Request;
 
 class RekUserController extends AdminController
 {
@@ -22,8 +22,10 @@ class RekUserController extends AdminController
     }
     /**
      * Главная страница
+     *
+     * @return string
      */
-    public function index()
+    public function index(): string
     {
         $total = RekUser::query()->where('deleted_at', '>', SITETIME)->count();
         $page = paginate(setting('rekuserpost'), $total);
@@ -38,29 +40,31 @@ class RekUserController extends AdminController
 
         return view('admin/rekusers/index', compact('records', 'page'));
     }
+
     /**
      * Редактирование ссылки
      *
-     * @param $id
+     * @param int       $id
+     * @param Request   $request
+     * @param Validator $validator
      * @return string
      */
-    public function edit($id)
+    public function edit(int $id, Request $request, Validator $validator): string
     {
-        $page = int(Request::input('page', 1));
+        $page = int($request->input('page', 1));
         $link = RekUser::query()->find($id);
 
         if (! $link) {
             abort(404, 'Данной ссылки не существует!');
         }
 
-        if (Request::isMethod('post')) {
-            $token = check(Request::input('token'));
-            $site  = check(Request::input('site'));
-            $name  = check(Request::input('name'));
-            $color = check(Request::input('color'));
-            $bold  = empty(Request::input('bold')) ? 0 : 1;
+        if ($request->isMethod('post')) {
+            $token = check($request->input('token'));
+            $site  = check($request->input('site'));
+            $name  = check($request->input('name'));
+            $color = check($request->input('color'));
+            $bold  = empty($request->input('bold')) ? 0 : 1;
 
-            $validator = new Validator();
             $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
                 ->regex($site, '|^https?://([а-яa-z0-9_\-\.])+(\.([а-яa-z0-9\/\-?_=#])+)+$|iu', ['site' => 'Недопустимый адрес сайта!. Разрешены символы [а-яa-z0-9_-.?=#/]!'])
                 ->length($site, 5, 50, ['site' => 'Слишком длинный или короткий адрес ссылки!'])
@@ -81,23 +85,26 @@ class RekUserController extends AdminController
                 setFlash('success', 'Рекламная ссылка успешно изменена!');
                 redirect('/admin/reklama?page=' . $page);
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }
 
         return view('admin/rekusers/edit', compact('link', 'page'));
     }
+
     /**
      * Удаление записей
+     *
+     * @param Request   $request
+     * @param Validator $validator
+     * @return void
      */
-    public function delete()
+    public function delete(Request $request, Validator $validator): void
     {
-        $page  = int(Request::input('page', 1));
-        $token = check(Request::input('token'));
-        $del   = intar(Request::input('del'));
-
-        $validator = new Validator();
+        $page  = int($request->input('page', 1));
+        $token = check($request->input('token'));
+        $del   = intar($request->input('del'));
 
         $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
             ->true($del, 'Отсутствуют выбранные записи для удаления!');

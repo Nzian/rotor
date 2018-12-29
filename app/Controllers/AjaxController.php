@@ -2,14 +2,14 @@
 
 namespace App\Controllers;
 
-use App\Classes\{Request, Validator};
+use App\Classes\Validator;
 use App\Models\{
     Blog,
     Comment,
     Down,
     File,
     Guestbook,
-    Inbox,
+    Message,
     Item,
     News,
     Offer,
@@ -19,66 +19,50 @@ use App\Models\{
     Spam,
     Wall
 };
+use Illuminate\Http\Request;
 
 class AjaxController extends BaseController
 {
     /**
      * Конструктор
+     *
+     * @param Request $request
      */
-    public function __construct()
+    public function __construct(Request $request)
     {
         parent::__construct();
-        $this->checkAjax();
+        $this->checkAjax($request);
         $this->checkAuthorize();
     }
 
     /**
-     * Проверяет является ли запрос ajax
+     * Возвращает bbCode для предпросмотра
+     *
+     * @param Request $request
+     * @return string
      */
-    public function checkAjax()
+    public function bbCode(Request $request): string
     {
-        if (! Request::ajax()) {
-            return json_encode([
-                'status' => 'error',
-                'message' => 'This is not ajax request'
-            ]);
-        }
-    }
-
-    /**
-     * Проверяет является ли запрос ajax
-     */
-    public function checkAuthorize()
-    {
-        if (! getUser()) {
-            return json_encode([
-                'status' => 'error',
-                'message' => 'Not authorized'
-            ]);
-        }
-    }
-
-    /**
-     * Предпросмотр bbCode
-     */
-    public function bbCode()
-    {
-        $message = check(Request::input('data'));
+        $message = check($request->input('data'));
 
         return view('app/_bbcode', compact('message'));
     }
 
     /**
-     * Жалоба на сообщение
+     * Отправляет жалобу на сообщение
+     *
+     * @param Request   $request
+     * @param Validator $validator
+     * @return string
      */
-    public function complaint()
+    public function complaint(Request $request, Validator $validator): string
     {
         $path  = null;
         $data  = false;
-        $id    = int(Request::input('id'));
-        $type  = check(Request::input('type'));
-        $page  = check(Request::input('page'));
-        $token = check(Request::input('token'));
+        $id    = int($request->input('id'));
+        $type  = check($request->input('type'));
+        $page  = check($request->input('page'));
+        $token = check($request->input('token'));
 
         switch ($type):
             case Guestbook::class:
@@ -91,7 +75,7 @@ class AjaxController extends BaseController
                 $path = '/topics/' . $data->topic_id . '?page='.$page;
                 break;
 
-            case Inbox::class:
+            case Message::class:
                 $data = $type::query()->find($id);
                 break;
 
@@ -148,7 +132,6 @@ class AjaxController extends BaseController
 
         $spam = Spam::query()->where(['relate_type' => $type, 'relate_id' => $id])->first();
 
-        $validator = new Validator();
         $validator
             ->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
             ->true($data, 'Выбранное вами сообщение для жалобы не существует!')
@@ -167,26 +150,29 @@ class AjaxController extends BaseController
         }
 
         return json_encode([
-            'status' => 'error',
+            'status'  => 'error',
             'message' => current($validator->getErrors())
         ]);
     }
 
     /**
-     * Удаление комментариев
+     * Удаляет комментарии
+     *
+     * @param Request   $request
+     * @param Validator $validator
+     * @return string
      */
-    public function delComment()
+    public function delComment(Request $request, Validator $validator): string
     {
         if (! isAdmin()) {
             return json_encode(['status' => 'error', 'message' => 'Not authorized']);
         }
 
-        $token = check(Request::input('token'));
-        $type  = check(Request::input('type'));
-        $rid   = int(Request::input('rid'));
-        $id    = int(Request::input('id'));
+        $token = check($request->input('token'));
+        $type  = check($request->input('type'));
+        $rid   = int($request->input('rid'));
+        $id    = int($request->input('id'));
 
-        $validator = new Validator();
         $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!');
 
         if ($validator->isValid()) {
@@ -204,15 +190,19 @@ class AjaxController extends BaseController
         }
 
         return json_encode([
-            'status' => 'error',
+            'status'  => 'error',
             'message' => current($validator->getErrors())
         ]);
     }
 
     /**
-     * Изменение рейтинга
+     * Изменяет рейтинг
+     *
+     * @param Request $request
+     * @return string
+     * @throws \Exception
      */
-    public function rating()
+    public function rating(Request $request): string
     {
         $types = [
             Post::class,
@@ -222,20 +212,20 @@ class AjaxController extends BaseController
             Offer::class,
         ];
 
-        $id    = int(Request::input('id'));
-        $type  = check(Request::input('type'));
-        $vote  = check(Request::input('vote'));
-        $token = check(Request::input('token'));
+        $id    = int($request->input('id'));
+        $type  = check($request->input('type'));
+        $vote  = check($request->input('vote'));
+        $token = check($request->input('token'));
 
         if ($token !== $_SESSION['token']) {
             return json_encode(['status' => 'error', 'message' => 'Invalid token']);
         }
 
-        if (! in_array($vote, ['+', '-'], true)) {
+        if (! \in_array($vote, ['+', '-'], true)) {
             return json_encode(['status' => 'error', 'message' => 'Invalid rating']);
         }
 
-        if (! in_array($type, $types, true)) {
+        if (! \in_array($type, $types, true)) {
             return json_encode(['status' => 'error', 'message' => 'Type invalid']);
         }
 
@@ -287,9 +277,13 @@ class AjaxController extends BaseController
     }
 
     /**
-     * Загрузка изображений
+     * Загружает изображение
+     *
+     * @param Request   $request
+     * @param Validator $validator
+     * @return string
      */
-    public function uploadImage()
+    public function uploadImage(Request $request, Validator $validator): string
     {
         $types = [
             Blog::class,
@@ -297,12 +291,12 @@ class AjaxController extends BaseController
             Photo::class,
         ];
 
-        $image = Request::file('image');
-        $id    = int(Request::input('id'));
-        $type  = check(Request::input('type'));
-        $token = check(Request::input('token'));
+        $image = $request->file('image');
+        $id    = int($request->input('id'));
+        $type  = check($request->input('type'));
+        $token = check($request->input('token'));
 
-        if (! in_array($type, $types, true)) {
+        if (! \in_array($type, $types, true)) {
             return json_encode(['status' => 'error', 'message' => 'Type invalid']);
         }
 
@@ -325,7 +319,6 @@ class AjaxController extends BaseController
             ->where('user_id', getUser('id'))
             ->count();
 
-        $validator = new Validator();
         $validator
             ->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
             ->lt($countFiles, setting('maxfiles'), 'Разрешено загружать не более ' . setting('maxfiles') . ' файлов!');
@@ -358,9 +351,14 @@ class AjaxController extends BaseController
     }
 
     /**
-     * Удаление изображений
+     * Удаляет изображение
+     *
+     * @param Request   $request
+     * @param Validator $validator
+     * @return string
+     * @throws \Exception
      */
-    public function deleteImage()
+    public function deleteImage(Request $request, Validator $validator): string
     {
         $types = [
             Blog::class,
@@ -368,14 +366,15 @@ class AjaxController extends BaseController
             Photo::class,
         ];
 
-        $id    = int(Request::input('id'));
-        $type  = check(Request::input('type'));
-        $token = check(Request::input('token'));
+        $id    = int($request->input('id'));
+        $type  = check($request->input('type'));
+        $token = check($request->input('token'));
 
-        if (! in_array($type, $types, true)) {
+        if (! \in_array($type, $types, true)) {
             return json_encode(['status' => 'error', 'message' => 'Type invalid']);
         }
 
+        /** @var File $file */
         $file = File::query()
             ->where('relate_type', $type)
             ->find($id);
@@ -387,7 +386,6 @@ class AjaxController extends BaseController
             ]);
         }
 
-        $validator = new Validator();
         $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
             ->true($file->user_id === getUser('id') || isAdmin(), 'Удаление невозможно, вы не автор данного файла!');
 
@@ -397,7 +395,7 @@ class AjaxController extends BaseController
             $file->delete();
 
             return json_encode([
-                'status'  => 'success',
+                'status' => 'success',
             ]);
         }
 
@@ -405,5 +403,40 @@ class AjaxController extends BaseController
             'status'  => 'error',
             'message' => current($validator->getErrors())
         ]);
+    }
+
+    /**
+     * Возвращает является ли запрос ajax
+     *
+     * @param Request $request
+     * @return string
+     */
+    private function checkAjax(Request $request): string
+    {
+        if (! $request->ajax()) {
+            exit(json_encode([
+                'status'  => 'error',
+                'message' => 'This is not ajax request'
+            ]));
+        }
+
+        return true;
+    }
+
+    /**
+     * Возвращает авторизован ли пользователь
+     *
+     * @return string
+     */
+    private function checkAuthorize(): string
+    {
+        if (! getUser()) {
+            exit(json_encode([
+                'status'  => 'error',
+                'message' => 'Not authorized'
+            ]));
+        }
+
+        return true;
     }
 }

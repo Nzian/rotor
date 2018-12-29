@@ -2,20 +2,23 @@
 
 namespace App\Controllers;
 
-use App\Classes\Request;
 use App\Classes\Validator;
 use App\Models\Flood;
 use App\Models\Ignore;
 use App\Models\User;
 use App\Models\Wall;
 use Illuminate\Database\Capsule\Manager as DB;
+use Illuminate\Http\Request;
 
 class WallController extends BaseController
 {
     /**
      * Главная страница
+     *
+     * @param string $login
+     * @return string
      */
-    public function index($login)
+    public function index(string $login): string
     {
         $user = User::query()->where('login', $login)->first();
 
@@ -35,7 +38,7 @@ class WallController extends BaseController
             ->with('user', 'author')
             ->get();
 
-        if ($newWall && $user->id == getUser('id')) {
+        if ($newWall && $user->id === getUser('id')) {
             $user->update([
                 'newwall' => 0,
             ]);
@@ -46,8 +49,13 @@ class WallController extends BaseController
 
     /**
      * Добавление сообщения
+     *
+     * @param string    $login
+     * @param Request   $request
+     * @param Validator $validator
+     * @return void
      */
-    public function create($login)
+    public function create($login, Request $request, Validator $validator): void
     {
         if (! getUser()) {
             abort(403, 'Для отправки сообщений необходимо авторизоваться!');
@@ -59,11 +67,10 @@ class WallController extends BaseController
             abort(404, 'Пользователь не найден!');
         }
 
-        if (Request::isMethod('post')) {
-            $token = check(Request::input('token'));
-            $msg   = check(Request::input('msg'));
+        if ($request->isMethod('post')) {
+            $token = check($request->input('token'));
+            $msg   = check($request->input('msg'));
 
-            $validator = new Validator();
             $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
                 ->length($msg, 5, 1000, ['msg' => 'Слишком длинное или короткое сообщение!'])
                 ->equal(Flood::isFlood(), true, ['msg' => 'Антифлуд! Разрешается отправлять сообщения раз в ' . Flood::getPeriod() . ' сек!']);
@@ -77,7 +84,7 @@ class WallController extends BaseController
 
             if ($validator->isValid()) {
 
-                if ($user->id != getUser('id')) {
+                if ($user->id !== getUser('id')) {
                     $user->increment('newwall');
                 }
 
@@ -88,7 +95,7 @@ class WallController extends BaseController
                     'created_at' => SITETIME,
                 ]);
 
-                DB::delete('
+                DB::connection()->delete('
                         DELETE FROM walls WHERE user_id = ? AND created_at < (
                             SELECT min(created_at) FROM (
                                 SELECT created_at FROM walls WHERE user_id = ? ORDER BY created_at DESC LIMIT ?
@@ -99,7 +106,7 @@ class WallController extends BaseController
 
                 setFlash('success', 'Запись успешно добавлена!');
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
 
@@ -109,21 +116,25 @@ class WallController extends BaseController
 
     /**
      * Удаление сообщений
+     *
+     * @param string    $login
+     * @param Request   $request
+     * @param Validator $validator
+     * @return void
      */
-    public function delete($login)
+    public function delete(string $login, Request $request, Validator $validator): void
     {
-        $id    = int(Request::input('id'));
-        $token = check(Request::input('token'));
+        $id    = int($request->input('id'));
+        $token = check($request->input('token'));
 
         $user = User::query()->where('login', $login)->first();
 
-        $validator = new Validator();
         $validator
-            ->true(Request::ajax(), 'Это не ajax запрос!')
+            ->true($request->ajax(), 'Это не ajax запрос!')
             ->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
             ->notEmpty($id, 'Не выбрана запись для удаление!')
             ->notEmpty($user, 'Пользователь не найден!')
-            ->true((isAdmin() || $user->id == getUser('id')), 'Записи может удалять только владелец и администрация!');
+            ->true(isAdmin() || $user->id === getUser('id'), 'Записи может удалять только владелец и администрация!');
 
         if ($validator->isValid()) {
 

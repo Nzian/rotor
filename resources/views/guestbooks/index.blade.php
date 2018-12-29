@@ -16,7 +16,7 @@
     </nav>
 
     <a href="/rules">{{ trans('common.rules') }}</a> /
-    <a href="/smiles">{{ trans('common.smiles') }}</a> /
+    <a href="/stickers">{{ trans('common.stickers') }}</a> /
     <a href="/tags">{{ trans('common.tags') }}</a>
 
     @if (isAdmin())
@@ -75,7 +75,7 @@
                     <span class="data">{{ $data->brow }}, {{ $data->ip }}</span>
                 @endif
 
-                @if ($data->reply))
+                @if ($data->reply)
                     <br><span style="color:#ff0000">{{ trans('guestbooks.answer') }}: {!! bbCode($data->reply) !!}</span>
                 @endif
             </div>
@@ -101,7 +101,7 @@
             </form>
         </div><br>
 
-    @elseif (setting('bookadds') == 1)
+    @elseif (setting('bookadds'))
 
         <div class="form">
             <form action="/guestbooks/add" method="post">

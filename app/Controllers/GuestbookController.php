@@ -2,18 +2,20 @@
 
 namespace App\Controllers;
 
-use App\Classes\Request;
 use App\Classes\Validator;
 use App\Models\Flood;
 use App\Models\Guestbook;
 use Illuminate\Database\Capsule\Manager as DB;
+use Illuminate\Http\Request;
 
 class GuestbookController extends BaseController
 {
     /**
      * Главная страница
+     *
+     * @return string
      */
-    public function index()
+    public function index(): string
     {
         $total = Guestbook::query()->count();
         $page = paginate(setting('bookpost'), $total);
@@ -30,13 +32,16 @@ class GuestbookController extends BaseController
 
     /**
      * Добавление сообщения
+     *
+     * @param Request   $request
+     * @param Validator $validator
+     * @return void
      */
-    public function add()
+    public function add(Request $request, Validator $validator): void
     {
-        $msg   = check(Request::input('msg'));
-        $token = check(Request::input('token'));
+        $msg   = check($request->input('msg'));
+        $token = check($request->input('token'));
 
-        $validator = new Validator();
         $validator->equal($token, $_SESSION['token'], ['msg' => 'Неверный идентификатор сессии, повторите действие!'])
             ->length($msg, 5, setting('guesttextlength'), ['msg' => 'Слишком длинное или короткое сообщение!'])
             ->true(Flood::isFlood(), ['msg' => 'Антифлуд! Разрешается отправлять сообщения раз в ' . Flood::getPeriod() . ' секунд!']);
@@ -44,6 +49,7 @@ class GuestbookController extends BaseController
         /* Проерка для гостей */
         if (! getUser() && setting('bookadds')) {
             $validator->true(captchaVerify(), ['protect' => 'Не удалось пройти проверку captcha!']);
+            $validator->false(stripos($msg, 'http'), ['msg' => 'Текст сообщения не должен содержать ссылок!']);
         } else {
             $validator->true(getUser(), ['msg' => 'Для добавления сообщения необходимо авторизоваться']);
         }
@@ -56,9 +62,9 @@ class GuestbookController extends BaseController
                 $bookscores = setting('bookscores') ? 1 : 0;
 
                 getUser()->update([
-                    'allguest' => DB::raw('allguest + 1'),
-                    'point'    => DB::raw('point + ' . $bookscores),
-                    'money'    => DB::raw('money + 5'),
+                    'allguest' => DB::connection()->raw('allguest + 1'),
+                    'point'    => DB::connection()->raw('point + ' . $bookscores),
+                    'money'    => DB::connection()->raw('money + 5'),
                 ]);
             }
 
@@ -76,7 +82,7 @@ class GuestbookController extends BaseController
 
             setFlash('success', 'Сообщение успешно добавлено!');
         } else {
-            setInput(Request::all());
+            setInput($request->all());
             setFlash('danger', $validator->getErrors());
         }
 
@@ -85,13 +91,19 @@ class GuestbookController extends BaseController
 
     /**
      * Редактирование сообщения
+     *
+     * @param int       $id
+     * @param Request   $request
+     * @param Validator $validator
+     * @return string
      */
-    public function edit($id)
+    public function edit(int $id, Request $request, Validator $validator): string
     {
         if (! getUser()) {
             abort(403);
         }
 
+        /** @var Guestbook $post */
         $post = Guestbook::query()->where('user_id', getUser('id'))->find($id);
 
         if (! $post) {
@@ -102,12 +114,11 @@ class GuestbookController extends BaseController
             abort('default', 'Редактирование невозможно, прошло более 10 минут!');
         }
 
-        if (Request::isMethod('post')) {
+        if ($request->isMethod('post')) {
 
-            $msg   = check(Request::input('msg'));
-            $token = check(Request::input('token'));
+            $msg   = check($request->input('msg'));
+            $token = check($request->input('token'));
 
-            $validator = new Validator();
             $validator->equal($token, $_SESSION['token'], ['msg' => 'Неверный идентификатор сессии, повторите действие!'])
                 ->length($msg, 5, setting('guesttextlength'), ['msg' => 'Слишком длинное или короткое сообщение!']);
 
@@ -124,7 +135,7 @@ class GuestbookController extends BaseController
                 setFlash('success', 'Сообщение успешно отредактировано!');
                 redirect('/guestbooks');
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }

@@ -52,7 +52,7 @@
         <i class="far fa-circle fa-lg text-muted"></i> <a href="/admin/errors">Ошибки / Автобаны</a><br>
         <i class="far fa-circle fa-lg text-muted"></i> <a href="/admin/blacklists">Черный список</a> ({{ statsBlacklist() }})<br>
         <i class="far fa-circle fa-lg text-muted"></i> <a href="/admin/offers">Предложения / Проблемы</a> ({{ statsOffers() }})<br>
-        <i class="far fa-circle fa-lg text-muted"></i> <a href="/admin/smiles">Смайлы</a> ({{ statsSmiles() }})<br>
+        <i class="far fa-circle fa-lg text-muted"></i> <a href="/admin/stickers">Стикеры</a> ({{ statsStickers() }})<br>
         <i class="far fa-circle fa-lg text-muted"></i> <a href="/admin/status">Статусы пользователей</a><br>
     @endif
 
@@ -66,17 +66,24 @@
         <i class="far fa-circle fa-lg text-muted"></i> <a href="/admin/delivery">Приват-рассылка</a><br>
         <i class="far fa-circle fa-lg text-muted"></i> <a href="/admin/logs">Логи посещений</a><br>
         <i class="far fa-circle fa-lg text-muted"></i> <a href="/admin/notices">Шаблоны писем</a><br>
-        <i class="far fa-circle fa-lg text-muted"></i> <a href="/admin/files">Редактирование файлов</a><br>
+        <i class="far fa-circle fa-lg text-muted"></i> <a href="/admin/files">Редактирование страниц</a><br>
         <i class="far fa-circle fa-lg text-muted"></i> <a href="/admin/delusers">Чистка пользователей</a><br>
+        <i class="far fa-circle fa-lg text-muted"></i> <a href="/admin/modules">Модули</a><br>
     @endif
 
     @if (! $existBoss)
-        <br><div class="b"><b><span style="color:#ff0000">Внимание!!! Отсутствует профиль суперадмина</span></b><br>
-        В базе данных не найден пользователь с правами boss</div>
+        <div class="p-1 bg-danger text-white">
+            <i class="fas fa-exclamation-triangle"></i>
+            Внимание! Отсутствует профиль суперадмина<br>
+            В базе данных не найден пользователь с правами boss
+        </div>
     @endif
 
     @if (file_exists(HOME.'/install'))
-        <br><div class="b"><b><span style="color:#ff0000">Внимание!!! Необходимо удалить директорию install</span></b><br>
-        Наличие этой директории может нарушить безопасность сайта. Удалите ее прямо сейчас!</div>
+        <div class="p-1 bg-danger text-white">
+            <i class="fas fa-exclamation-triangle"></i>
+            Внимание! Необходимо удалить директорию install<br>
+            Наличие этой директории может нарушить безопасность сайта. Удалите ее прямо сейчас!
+        </div>
     @endif
 @stop

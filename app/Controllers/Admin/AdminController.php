@@ -11,6 +11,9 @@ use Illuminate\Database\Capsule\Manager as DB;
 
 Class AdminController extends BaseController
 {
+    /**
+     * AdminController constructor.
+     */
     public function __construct()
     {
         parent::__construct();
@@ -31,8 +34,10 @@ Class AdminController extends BaseController
 
     /**
      * Главная страница
+     *
+     * @return string
      */
-    public function main()
+    public function main(): string
     {
         $existBoss = User::query()
             ->where('level', User::BOSS)
@@ -43,10 +48,12 @@ Class AdminController extends BaseController
 
     /**
      * Проверка обновлений
+     *
+     * @param PhinxApplication $app
+     * @return string
      */
-    public function upgrade()
+    public function upgrade(PhinxApplication $app): string
     {
-        $app  = new PhinxApplication();
         $wrap = new TextWrapper($app);
 
         $app->setName('Rotor by Vantuz - http://visavi.net');
@@ -61,8 +68,10 @@ Class AdminController extends BaseController
 
     /**
      * Просмотр информации о PHP
+     *
+     * @return string
      */
-    public function phpinfo()
+    public function phpinfo(): string
     {
         if (! isAdmin(User::ADMIN)) {
             abort(403, 'Доступ запрещен!');
@@ -71,7 +80,7 @@ Class AdminController extends BaseController
         $iniInfo = null;
         $gdInfo  = null;
 
-        if (function_exists('ini_get_all')) {
+        if (\function_exists('ini_get_all')) {
             $iniInfo = ini_get_all();
         }
 
@@ -79,7 +88,7 @@ Class AdminController extends BaseController
             $gdInfo = parseVersion($gdInfo['GD Version']);
         }
 
-        $mysqlVersion = DB::selectOne('SHOW VARIABLES LIKE "version"');
+        $mysqlVersion = DB::connection()->selectOne('SHOW VARIABLES LIKE "version"');
         $mysqlVersion = parseVersion($mysqlVersion->Value);
 
         return view('admin/phpinfo', compact('iniInfo', 'gdInfo', 'mysqlVersion'));

@@ -2,10 +2,10 @@
 
 namespace App\Controllers\Admin;
 
-use App\Classes\Request;
 use App\Classes\Validator;
 use App\Models\Invite;
 use App\Models\User;
+use Illuminate\Http\Request;
 
 class InvitationController extends AdminController
 {
@@ -23,10 +23,13 @@ class InvitationController extends AdminController
 
     /**
      * Главная страница
+     *
+     * @param Request $request
+     * @return string
      */
-    public function index()
+    public function index(Request $request): string
     {
-        $used = Request::input('used') == 1 ? 1 : 0;
+        $used = $request->input('used') ? 1 : 0;
 
         $total = Invite::query()->where('used', $used)->count();
         $page = paginate(setting('listinvite'), $total);
@@ -44,8 +47,10 @@ class InvitationController extends AdminController
 
     /**
      * Список ключей
+     *
+     * @return string
      */
-    public function keys()
+    public function keys(): string
     {
         $keys = Invite::query()
             ->where('user_id', getUser('id'))
@@ -58,14 +63,18 @@ class InvitationController extends AdminController
 
     /**
      * Создание ключей
+     *
+     * @param Request   $request
+     * @param Validator $validator
+     * @return string
+     * @throws \Exception
      */
-    public function create()
+    public function create(Request $request, Validator $validator): string
     {
-        if (Request::isMethod('post')) {
-            $token  = check(Request::input('token'));
-            $keys   = int(Request::input('keys'));
+        if ($request->isMethod('post')) {
+            $token  = check($request->input('token'));
+            $keys   = int($request->input('keys'));
 
-            $validator = new Validator();
             $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
                 ->notEmpty($keys, ['keys' => 'Не указано число ключей!']);
 
@@ -86,28 +95,33 @@ class InvitationController extends AdminController
                 setFlash('success', 'Ключи успешно созданы!');
                 redirect('/admin/invitations');
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }
 
-        $listKeys = [1,2,3,4,5,10,15,20,30,40,50];
+        $listKeys = [1, 2, 3, 4, 5, 10, 15, 20, 30, 40, 50];
 
         return view('admin/invitations/create', compact('listKeys'));
     }
 
     /**
      * Отправка ключей пользователю
+     *
+     * @param Request   $request
+     * @param Validator $validator
+     * @return void
+     * @throws \Exception
      */
-    public function send()
+    public function send(Request $request, Validator $validator): void
     {
-        $token    = check(Request::input('token'));
-        $login    = check(Request::input('user'));
-        $userkeys = int(Request::input('userkeys'));
+        $token    = check($request->input('token'));
+        $login    = check($request->input('user'));
+        $userkeys = int($request->input('userkeys'));
 
+        /* @var User $user */
         $user = getUserByLogin($login);
 
-        $validator = new Validator();
         $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
             ->notEmpty($user, ['user' => 'Пользователя с данным логином не существует!'])
             ->notEmpty($userkeys, ['userkeys' => 'Не указано число ключей!']);
@@ -132,13 +146,13 @@ class InvitationController extends AdminController
 
             Invite::query()->insert($newKeys);
 
-            $text = 'Вы получили пригласительные ключи в количестве '.count($listKeys).'шт.'.PHP_EOL.'Список ключей: '.implode(', ', $listKeys).PHP_EOL.'С помощью этих ключей вы можете пригласить ваших друзей на наш сайт!';
+            $text = 'Вы получили пригласительные ключи в количестве ' . \count($listKeys) . 'шт.'.PHP_EOL.'Список ключей: '.implode(', ', $listKeys).PHP_EOL.'С помощью этих ключей вы можете пригласить ваших друзей на наш сайт!';
             $user->sendMessage(null, $text);
 
             setFlash('success', 'Ключи успешно отправлены!');
             redirect('/admin/invitations');
         } else {
-            setInput(Request::all());
+            setInput($request->all());
             setFlash('danger', $validator->getErrors());
             redirect('/admin/invitations/create');
         }
@@ -146,12 +160,16 @@ class InvitationController extends AdminController
 
     /**
      * Отправка ключей активным пользователям
+     *
+     * @param Request   $request
+     * @param Validator $validator
+     * @return void
+     * @throws \Exception
      */
-    public function mail()
+    public function mail(Request $request, Validator $validator): void
     {
-        $token    = check(Request::input('token'));
+        $token = check($request->input('token'));
 
-        $validator = new Validator();
         $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
             ->true(isAdmin(User::BOSS), 'Рассылать ключи может только владелец');
 
@@ -165,6 +183,7 @@ class InvitationController extends AdminController
 
         if ($validator->isValid()) {
 
+            /** @var User $user */
             foreach ($users as $user) {
                 $key = str_random(random_int(12, 15));
 
@@ -174,14 +193,14 @@ class InvitationController extends AdminController
                     'created_at' => SITETIME,
                 ]);
 
-                $text = 'Поздравляем! Вы получили пригласительный ключ'.PHP_EOL.'Ваш ключ: '.$key.PHP_EOL.'С помощью этого ключа вы можете пригласить вашего друга на наш сайт!';
+                $text = 'Поздравляем! Вы получили пригласительный ключ' . PHP_EOL . 'Ваш ключ: ' . $key . PHP_EOL.'С помощью этого ключа вы можете пригласить вашего друга на наш сайт!';
                 $user->sendMessage(null, $text);
             }
 
             setFlash('success', 'Ключи успешно отправлены! ('. $users->count() .')');
             redirect('/admin/invitations');
         } else {
-            setInput(Request::all());
+            setInput($request->all());
             setFlash('danger', $validator->getErrors());
             redirect('/admin/invitations/create');
         }
@@ -189,15 +208,18 @@ class InvitationController extends AdminController
 
     /**
      * Удаление ключей
+     *
+     * @param Request   $request
+     * @param Validator $validator
+     * @return void
      */
-    public function delete()
+    public function delete(Request $request, Validator $validator): void
     {
-        $page  = int(Request::input('page', 1));
-        $token = check(Request::input('token'));
-        $del   = intar(Request::input('del'));
-        $used  = Request::input('used') == 1 ? 1 : 0;
+        $page  = int($request->input('page', 1));
+        $token = check($request->input('token'));
+        $del   = intar($request->input('del'));
+        $used  = $request->input('used') ? 1 : 0;
 
-        $validator = new Validator();
         $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
             ->true($del, 'Отсутствуют выбранные записи для удаления!');
 

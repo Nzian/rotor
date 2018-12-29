@@ -2,10 +2,10 @@
 
 namespace App\Controllers\Admin;
 
-use App\Classes\Request;
 use App\Classes\Validator;
 use App\Models\Rule;
 use App\Models\User;
+use Illuminate\Http\Request;
 
 class RuleController extends AdminController
 {
@@ -23,8 +23,10 @@ class RuleController extends AdminController
 
     /**
      * Главная страница
+     *
+     * @return string
      */
-    public function index()
+    public function index(): string
     {
         $rules = Rule::query()->first();
 
@@ -41,16 +43,19 @@ class RuleController extends AdminController
 
     /**
      * Редактирование правил
+     *
+     * @param Request   $request
+     * @param Validator $validator
+     * @return string
      */
-    public function edit()
+    public function edit(Request $request, Validator $validator): string
     {
         $rules = Rule::query()->firstOrNew([]);
 
-        if (Request::isMethod('post')) {
-            $token = check(Request::input('token'));
-            $msg   = check(Request::input('msg'));
+        if ($request->isMethod('post')) {
+            $token = check($request->input('token'));
+            $msg   = check($request->input('msg'));
 
-            $validator = new Validator();
             $validator
                 ->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
                 ->notEmpty($msg, ['msg' => 'Вы не ввели текст с правилами сайта!']);
@@ -66,7 +71,7 @@ class RuleController extends AdminController
                 redirect('/admin/rules');
 
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }

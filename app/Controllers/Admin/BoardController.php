@@ -2,13 +2,13 @@
 
 namespace App\Controllers\Admin;
 
-use App\Classes\Request;
 use App\Classes\Validator;
 use App\Models\Board;
 use App\Models\Item;
 use App\Models\User;
 use Exception;
-use Illuminate\Database\Capsule\Manager as DB;
+use Illuminate\Database\Query\Builder;
+use Illuminate\Http\Request;
 
 class BoardController extends AdminController
 {
@@ -23,6 +23,7 @@ class BoardController extends AdminController
         $board = null;
 
         if ($id) {
+            /** @var Board $board */
             $board = Board::query()->find($id);
 
             if (! $board) {
@@ -31,7 +32,7 @@ class BoardController extends AdminController
         }
 
         $total = Item::query()
-            ->when($board, function ($query) use ($board) {
+            ->when($board, function (Builder $query) use ($board) {
                 return $query->where('board_id', $board->id);
             })
             ->where('expires_at', '>', SITETIME)
@@ -40,7 +41,7 @@ class BoardController extends AdminController
         $page = paginate(10, $total);
 
         $items = Item::query()
-            ->when($board, function ($query) use ($board) {
+            ->when($board, function (Builder $query) use ($board) {
                 return $query->where('board_id', $board->id);
             })
             ->where('expires_at', '>', SITETIME)
@@ -80,25 +81,27 @@ class BoardController extends AdminController
     /**
      * Создание раздела
      *
+     * @param Request   $request
+     * @param Validator $validator
      * @return void
      */
-    public function create(): void
+    public function create(Request $request, Validator $validator): void
     {
         if (! isAdmin(User::BOSS)) {
             abort(403, 'Доступ запрещен!');
         }
 
-        $token = check(Request::input('token'));
-        $name  = check(Request::input('name'));
+        $token = check($request->input('token'));
+        $name  = check($request->input('name'));
 
-        $validator = new Validator();
-        $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
+        $validator->equal($token, $_SESSION['token'], trans('validator.token'))
             ->length($name, 3, 50, ['name' => 'Слишком длинное или короткое название раздела!']);
 
         if ($validator->isValid()) {
 
             $max = Board::query()->max('sort') + 1;
 
+            /** @var Board $board */
             $board = Board::query()->create([
                 'name'  => $name,
                 'sort'  => $max,
@@ -107,7 +110,7 @@ class BoardController extends AdminController
             setFlash('success', 'Новый раздел успешно создан!');
             redirect('/admin/boards/edit/' . $board->id);
         } else {
-            setInput(Request::all());
+            setInput($request->all());
             setFlash('danger', $validator->getErrors());
         }
 
@@ -117,15 +120,18 @@ class BoardController extends AdminController
     /**
      * Редактирование раздела
      *
-     * @param int $id
+     * @param int       $id
+     * @param Request   $request
+     * @param Validator $validator
      * @return string
      */
-    public function edit($id): string
+    public function edit(int $id, Request $request, Validator $validator): string
     {
         if (! isAdmin(User::BOSS)) {
             abort(403, 'Доступ запрещен!');
         }
 
+        /** @var Board $board */
         $board = Board::query()->with('children')->find($id);
 
         if (! $board) {
@@ -137,16 +143,15 @@ class BoardController extends AdminController
             ->orderBy('sort')
             ->get();
 
-        if (Request::isMethod('post')) {
-            $token  = check(Request::input('token'));
-            $parent = int(Request::input('parent'));
-            $name   = check(Request::input('name'));
-            $sort   = check(Request::input('sort'));
-            $closed = empty(Request::input('closed')) ? 0 : 1;
+        if ($request->isMethod('post')) {
+            $token  = check($request->input('token'));
+            $parent = int($request->input('parent'));
+            $name   = check($request->input('name'));
+            $sort   = check($request->input('sort'));
+            $closed = empty($request->input('closed')) ? 0 : 1;
 
-            $validator = new Validator();
-            $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
-                ->length($name, 3, 50, ['title' => 'Слишком длинное или короткое название раздела!'])
+            $validator->equal($token, $_SESSION['token'], trans('validator.token'))
+                ->length($name, 3, 50, ['name' => 'Слишком длинное или короткое название раздела!'])
                 ->notEqual($parent, $board->id, ['parent' => 'Недопустимый выбор родительского раздела!']);
 
             if (! empty($parent) && $board->children->isNotEmpty()) {
@@ -165,7 +170,7 @@ class BoardController extends AdminController
                 setFlash('success', 'Раздел успешно отредактирован!');
                 redirect('/admin/boards/categories');
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }
@@ -176,25 +181,27 @@ class BoardController extends AdminController
     /**
      * Удаление раздела
      *
-     * @param int $id
+     * @param int       $id
+     * @param Request   $request
+     * @param Validator $validator
      * @throws Exception
      */
-    public function delete($id): void
+    public function delete(int $id, Request $request, Validator $validator): void
     {
         if (! isAdmin(User::BOSS)) {
             abort(403, 'Доступ запрещен!');
         }
 
+        /** @var Board $board */
         $board = Board::query()->with('children')->find($id);
 
         if (! $board) {
             abort(404, 'Данного раздела не существует!');
         }
 
-        $token = check(Request::input('token'));
+        $token = check($request->input('token'));
 
-        $validator = new Validator();
-        $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
+        $validator->equal($token, $_SESSION['token'], trans('validator.token'))
             ->true($board->children->isEmpty(), 'Удаление невозможно! Данный раздел имеет подразделы!');
 
         $item = Item::query()->where('board_id', $board->id)->first();
@@ -217,33 +224,36 @@ class BoardController extends AdminController
     /**
      * Редактирование объявления
      *
-     * @param int $id
+     * @param int       $id
+     * @param Request   $request
+     * @param Validator $validator
      * @return string
      */
-    public function editItem($id): string
+    public function editItem(int $id, Request $request, Validator $validator): string
     {
+        /** @var Item $item */
         $item = Item::query()->find($id);
 
         if (! $item) {
             abort(404, 'Данного объявления не существует!');
         }
 
-        if (Request::isMethod('post')) {
-            $token = check(Request::input('token'));
-            $bid   = int(Request::input('bid'));
-            $title = check(Request::input('title'));
-            $text  = check(Request::input('text'));
-            $price = check(Request::input('price'));
-            $phone = preg_replace('/\D/', '', Request::input('phone'));
+        if ($request->isMethod('post')) {
+            $token = check($request->input('token'));
+            $bid   = int($request->input('bid'));
+            $title = check($request->input('title'));
+            $text  = check($request->input('text'));
+            $price = check($request->input('price'));
+            $phone = preg_replace('/\D/', '', $request->input('phone'));
 
+            /** @var Board $board */
             $board = Board::query()->find($bid);
 
-            $validator = new Validator();
             $validator
-                ->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
-                ->length($title, 5, 50, ['title' => 'Слишком длинное или короткое название!'])
-                ->length($text, 50, 5000, ['text' => 'Слишком длинный или короткий текст описания!'])
-                ->regex($phone, '#^\d{11}$#', ['phone' => 'Недопустимый формат телефона. Пример: 8-900-123-45-67!'], false)
+                ->equal($token, $_SESSION['token'], trans('validator.token'))
+                ->length($title, 5, 50, ['title' => trans('validator.name')])
+                ->length($text, 50, 5000, ['text' => trans('validator.text')])
+                ->regex($phone, '#^\d{11}$#', ['phone' => trans('validator.phone')], false)
                 ->notEmpty($board, ['bid' => 'Категории для данного объявления не существует!']);
 
             if ($board) {
@@ -269,7 +279,7 @@ class BoardController extends AdminController
                 setFlash('success', 'Объявление успешно отредактировано!');
                 redirect('/admin/items/edit/' . $item->id);
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }
@@ -286,20 +296,22 @@ class BoardController extends AdminController
     /**
      * Удаление объявления
      *
-     * @param int $id
+     * @param int       $id
+     * @param Request   $request
+     * @param Validator $validator
      * @throws Exception
      */
-    public function deleteItem($id): void
+    public function deleteItem(int $id, Request $request, Validator $validator): void
     {
-        $token = check(Request::input('token'));
+        $token = check($request->input('token'));
 
+        /** @var Item $item */
         $item = Item::query()->find($id);
 
         if (! $item) {
             abort(404, 'Данного объявления не существует!');
         }
 
-        $validator = new Validator();
         $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!');
 
         if ($validator->isValid()) {
@@ -319,15 +331,16 @@ class BoardController extends AdminController
     /**
      * Пересчет голосов
      *
+     * @param Request $request
      * @return void
      */
-    public function restatement(): void
+    public function restatement(Request $request): void
     {
         if (! isAdmin(User::BOSS)) {
             abort(403, 'Доступ запрещен!');
         }
 
-        $token = check(Request::input('token'));
+        $token = check($request->input('token'));
 
         if ($token === $_SESSION['token']) {
 

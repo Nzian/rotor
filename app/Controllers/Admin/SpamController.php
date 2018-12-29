@@ -2,15 +2,15 @@
 
 namespace App\Controllers\Admin;
 
-use App\Classes\Request;
 use App\Classes\Validator;
 use App\Models\Comment;
 use App\Models\Guestbook;
-use App\Models\Inbox;
+use App\Models\Message;
 use App\Models\Post;
 use App\Models\Spam;
 use App\Models\User;
 use App\Models\Wall;
+use Illuminate\Http\Request;
 
 class SpamController extends AdminController
 {
@@ -35,7 +35,7 @@ class SpamController extends AdminController
         $this->types = [
             'post'    => Post::class,
             'guest'   => Guestbook::class,
-            'inbox'   => Inbox::class,
+            'message' => Message::class,
             'wall'    => Wall::class,
             'comment' => Comment::class,
         ];
@@ -53,10 +53,13 @@ class SpamController extends AdminController
 
     /**
      * Главная страница
+     *
+     * @param Request $request
+     * @return string
      */
-    public function index()
+    public function index(Request $request): string
     {
-        $type = check(Request::input('type'));
+        $type = check($request->input('type'));
         $type = isset($this->types[$type]) ? $type : 'post';
 
         $page = paginate(setting('spamlist'),  $this->total[$type]);
@@ -69,7 +72,7 @@ class SpamController extends AdminController
             ->with('relate.user', 'user')
             ->get();
 
-        if (in_array($type, ['inbox', 'wall'])) {
+        if (\in_array($type, ['message', 'wall'])) {
             $records->load('relate.author');
         }
 
@@ -80,15 +83,19 @@ class SpamController extends AdminController
 
     /**
      * Удаление жалоб
+     *
+     * @param Request   $request
+     * @param Validator $validator
+     * @return void
+     * @throws \Exception
      */
-    public function delete()
+    public function delete(Request $request, Validator $validator): void
     {
-        $id    = int(Request::input('id'));
-        $token = check(Request::input('token'));
+        $id    = int($request->input('id'));
+        $token = check($request->input('token'));
 
-        $validator = new Validator();
         $validator
-            ->true(Request::ajax(), 'Это не ajax запрос!')
+            ->true($request->ajax(), 'Это не ajax запрос!')
             ->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
             ->notEmpty($id, 'Не выбрана запись для удаление!');
 

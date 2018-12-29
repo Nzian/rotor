@@ -5,8 +5,6 @@
 @stop
 
 @section('content')
-    <h1>Просмотр архива {{ $down->title }}</h1>
-
     <nav>
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="/"><i class="fas fa-home"></i></a></li>
@@ -22,6 +20,8 @@
         </ol>
     </nav>
 
+    <h1>Просмотр архива {{ $down->title }}</h1>
+
     Всего файлов: {{ $page->total }}<hr>
 
     @if ($documents)
@@ -35,7 +35,7 @@
 
                 {!! icons($ext) !!}
 
-                @if (in_array($ext, $viewExt))
+                @if (in_array($ext, $viewExt, true))
                     <a href="/downs/zip/{{ $file->id }}/{{ $key }}">{{ $document->getName() }}</a>
                 @else
                     {{ $document->getName() }}

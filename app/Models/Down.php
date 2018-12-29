@@ -2,14 +2,40 @@
 
 namespace App\Models;
 
+use App\Traits\UploadTrait;
 use FFMpeg\Coordinate\TimeCode;
 use FFMpeg\FFMpeg;
 use FFMpeg\FFProbe;
 use FFMpeg\Format\Video\X264;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Http\UploadedFile;
 
+/**
+ * Class Down
+ *
+ * @property int id
+ * @property int category_id
+ * @property string title
+ * @property string text
+ * @property int user_id
+ * @property int created_at
+ * @property int count_comments
+ * @property int rating
+ * @property int rated
+ * @property int loads
+ * @property int active
+ * @property int updated_at
+ * @property Collection files
+ * @property Collection comments
+ * @property Load category
+ */
 class Down extends BaseModel
 {
+    use UploadTrait;
+
     /**
      * Indicates if the model should be timestamped.
      *
@@ -40,8 +66,10 @@ class Down extends BaseModel
 
     /**
      * Возвращает категорию загрузок
+     *
+     * @return BelongsTo
      */
-    public function category()
+    public function category(): BelongsTo
     {
         return $this->belongsTo(Load::class, 'category_id')->withDefault();
     }
@@ -49,7 +77,7 @@ class Down extends BaseModel
     /**
      * Возвращает комментарии
      */
-    public function comments()
+    public function comments(): MorphMany
     {
         return $this->morphMany(Comment::class, 'relate');
     }
@@ -58,9 +86,9 @@ class Down extends BaseModel
      * Возвращает последнии комментарии к файлу
      *
      * @param int $limit
-     * @return mixed
+     * @return HasMany
      */
-    public function lastComments($limit = 15)
+    public function lastComments($limit = 15): HasMany
     {
         return $this->hasMany(Comment::class, 'relate_id')
             ->where('relate_type', self::class)
@@ -70,27 +98,31 @@ class Down extends BaseModel
     /**
      * Возвращает загруженные файлы
      */
-    public function files()
+    public function files(): MorphMany
     {
         return $this->morphMany(File::class, 'relate');
     }
 
     /**
      * Возвращает файлы
+     *
+     * @return Collection
      */
-    public function getFiles()
+    public function getFiles(): Collection
     {
-        return $this->files->filter(function ($value, $key) {
+        return $this->files->filter(function (File $value, $key) {
             return ! $value->isImage();
         });
     }
 
     /**
      * Возвращает картинки
+     *
+     * @return Collection
      */
-    public function getImages()
+    public function getImages(): Collection
     {
-        return $this->files->filter(function ($value, $key) {
+        return $this->files->filter(function (File $value, $key) {
             return $value->isImage();
         });
     }
@@ -103,7 +135,7 @@ class Down extends BaseModel
      */
     public function cutText($limit = 200): string
     {
-        if (strlen($this->text) > $limit) {
+        if (\strlen($this->text) > $limit) {
             $this->text = strip_tags(bbCode($this->text), '<br>');
             $this->text = mb_substr($this->text, 0, mb_strrpos(mb_substr($this->text, 0, $limit), ' ')) . '...';
         }
@@ -127,9 +159,9 @@ class Down extends BaseModel
      * @param  UploadedFile $file
      * @return array
      */
-    public function uploadFile(UploadedFile $file): array
+    public function uploadAndConvertFile(UploadedFile $file): array
     {
-        $upload = parent::uploadFile($file);
+        $upload = $this->uploadFile($file);
         $this->convertVideo($file, $upload['path']);
 
         return $upload;

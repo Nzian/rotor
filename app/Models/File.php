@@ -2,6 +2,22 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Relations\MorphTo;
+
+/**
+ * Class File
+ *
+ * @property int id
+ * @property string relate_type
+ * @property int relate_id
+ * @property string hash
+ * @property string name
+ * @property int size
+ * @property int user_id
+ * @property int created_at
+ * @property string extension
+ * @property object relate
+ */
 class File extends BaseModel
 {
     /**
@@ -20,8 +36,10 @@ class File extends BaseModel
 
     /**
      * Возвращает связанные модели
+     *
+     * @return MorphTo
      */
-    public function relate()
+    public function relate(): MorphTo
     {
         return $this->morphTo('relate');
     }
@@ -31,7 +49,7 @@ class File extends BaseModel
      *
      * @return string
      */
-    public function getExtensionAttribute()
+    public function getExtensionAttribute(): string
     {
         return getExtension($this->hash);
     }
@@ -41,8 +59,23 @@ class File extends BaseModel
      *
      * @return string
      */
-    public function isImage()
+    public function isImage(): string
     {
-        return in_array($this->extension, ['jpg', 'jpeg', 'gif', 'png']);
+        return \in_array($this->extension, ['jpg', 'jpeg', 'gif', 'png']);
+    }
+
+    /**
+     * Скачивает файл
+     *
+     * @return void
+     */
+    public function download(): void
+    {
+        header('Content-Type: application/octet-stream');
+        header('Content-Disposition: attachment; filename="' . $this->name . '"');
+        header('Content-Transfer-Encoding: binary');
+        header('Content-Length: ' . $this->size);
+        readfile(HOME . $this->hash);
+        exit;
     }
 }

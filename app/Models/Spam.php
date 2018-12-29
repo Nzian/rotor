@@ -2,6 +2,18 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Relations\MorphTo;
+
+/**
+ * Class Spam
+ *
+ * @property int id
+ * @property string relate_type
+ * @property int relate_id
+ * @property int user_id
+ * @property int created_at
+ * @property string path
+ */
 class Spam extends BaseModel
 {
     /**
@@ -27,8 +39,10 @@ class Spam extends BaseModel
 
     /**
      * Возвращает связанные сообщения
+     *
+     * @return MorphTo
      */
-    public function relate()
+    public function relate(): MorphTo
     {
         return $this->morphTo('relate');
     }

@@ -6,7 +6,7 @@ use Whoops\Handler\PlainTextHandler;
 use Whoops\Handler\PrettyPageHandler;
 use Whoops\Run;
 
-define('STARTTIME', microtime(1));
+define('STARTTIME', microtime(true));
 define('BASEDIR', dirname(__DIR__));
 define('APP', BASEDIR . '/app');
 define('HOME', BASEDIR . '/public');
@@ -14,7 +14,7 @@ define('UPLOADS', HOME . '/uploads');
 define('RESOURCES', BASEDIR . '/resources');
 define('STORAGE', BASEDIR . '/storage');
 define('SITETIME', time());
-define('VERSION', '7.3');
+define('VERSION', '7.5');
 
 require_once BASEDIR . '/vendor/autoload.php';
 

@@ -5,9 +5,6 @@
 @stop
 
 @section('content')
-
-    <h1>Список тем {{ $user->login }}</h1>
-
     <nav>
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="/"><i class="fas fa-home"></i></a></li>
@@ -15,6 +12,8 @@
             <li class="breadcrumb-item active">Список тем {{ $user->login }}</li>
         </ol>
     </nav>
+
+    <h1>Список тем {{ $user->login }}</h1>
 
     @foreach ($topics as $data)
         <div class="b">
@@ -25,7 +24,7 @@
         <div>
             {!! $data->pagination() !!}
             Форум: <a href="/forums/{{ $data->forum->id }}">{{ $data->forum->title }}</a><br>
-            Автор: {!! $data->user->getProfile(null, false) !!} / Посл.: {!! $data->lastPost->user->getProfile(null, false) !!} ({{ dateFixed($data->lastPost->created_at) }})
+            Автор: {{ $data->user->getName() }} / Посл.: {{ $data->lastPost->user->getName() }} ({{ dateFixed($data->lastPost->created_at) }})
         </div>
     @endforeach
 

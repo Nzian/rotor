@@ -2,8 +2,26 @@
 
 namespace App\Models;
 
+use App\Traits\UploadTrait;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+
+/**
+ * Class News
+ *
+ * @property int id
+ * @property string title
+ * @property string text
+ * @property int user_id
+ * @property string image
+ * @property int created_at
+ * @property int count_comments
+ * @property int closed
+ * @property int top
+ */
 class News extends BaseModel
 {
+    use UploadTrait;
+
     /**
      * Indicates if the model should be timestamped.
      *
@@ -26,16 +44,9 @@ class News extends BaseModel
     public $uploadPath = UPLOADS . '/news';
 
     /**
-     * Записывать файлы в таблицу
-     *
-     * @var bool
-     */
-    public $dataRecord = false;
-
-    /**
      * Возвращает комментарии новостей
      */
-    public function comments()
+    public function comments(): MorphMany
     {
         return $this->morphMany(Comment::class, 'relate');
     }
@@ -62,7 +73,7 @@ class News extends BaseModel
      */
     public function shortText(): string
     {
-        if (stristr($this->text, '[cut]')) {
+        if (stripos($this->text, '[cut]') !== false) {
             $this->text = current(explode('[cut]', $this->text)) . ' <a href="/news/'. $this->id .'" class="badge badge-success">Читать далее &raquo;</a>';
         }
 

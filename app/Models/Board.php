@@ -2,8 +2,26 @@
 
 namespace App\Models;
 
+use App\Traits\UploadTrait;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
+/**
+ * Class Board
+ *
+ * @property int id
+ * @property int sort
+ * @property int parent_id
+ * @property string name
+ * @property int count_items
+ * @property int closed
+ * @property Collection children
+ * @property Board parent
+ */
 class Board extends BaseModel
 {
+    use UploadTrait;
 
     /**
      * Indicates if the model should be timestamped.
@@ -28,16 +46,20 @@ class Board extends BaseModel
 
     /**
      * Возвращает связь родительской категории
+     *
+     * @return BelongsTo
      */
-    public function parent()
+    public function parent(): BelongsTo
     {
         return $this->belongsTo(self::class, 'parent_id')->withDefault();
     }
 
     /**
      * Возвращает связь подкатегорий
+     *
+     * @return HasMany
      */
-    public function children()
+    public function children(): HasMany
     {
         return $this->hasMany(self::class, 'parent_id')->orderBy('sort');
     }

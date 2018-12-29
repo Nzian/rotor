@@ -2,7 +2,6 @@
 
 namespace App\Controllers\Admin;
 
-use App\Classes\Request;
 use App\Classes\Validator;
 use App\Models\File;
 use App\Models\Forum;
@@ -10,8 +9,8 @@ use App\Models\Post;
 use App\Models\Topic;
 use App\Models\User;
 use App\Models\Vote;
-use Illuminate\Database\Capsule\Manager as DB;
 use Illuminate\Database\Query\JoinClause;
+use Illuminate\Http\Request;
 
 class ForumController extends AdminController
 {
@@ -32,17 +31,19 @@ class ForumController extends AdminController
 
     /**
      * Создание раздела
+     *
+     * @param Request   $request
+     * @param Validator $validator
      */
-    public function create()
+    public function create(Request $request, Validator $validator): void
     {
         if (! isAdmin(User::BOSS)) {
             abort(403, 'Доступ запрещен!');
         }
 
-        $token = check(Request::input('token'));
-        $title = check(Request::input('title'));
+        $token = check($request->input('token'));
+        $title = check($request->input('title'));
 
-        $validator = new Validator();
         $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
             ->length($title, 5, 50, ['title' => 'Слишком длинное или короткое название раздела!']);
 
@@ -50,6 +51,7 @@ class ForumController extends AdminController
 
             $max = Forum::query()->max('sort') + 1;
 
+            /** @var Forum $forum */
             $forum = Forum::query()->create([
                 'title' => $title,
                 'sort'  => $max,
@@ -58,22 +60,28 @@ class ForumController extends AdminController
             setFlash('success', 'Новый раздел успешно создан!');
             redirect('/admin/forums/edit/' . $forum->id);
         } else {
-            setInput(Request::all());
+            setInput($request->all());
             setFlash('danger', $validator->getErrors());
         }
 
-        redirect('/admin/forum');
+        redirect('/admin/forums');
     }
 
     /**
      * Редактирование форума
+     *
+     * @param int       $id
+     * @param Request   $request
+     * @param Validator $validator
+     * @return string
      */
-    public function edit($id)
+    public function edit(int $id, Request $request, Validator $validator): string
     {
         if (! isAdmin(User::BOSS)) {
             abort(403, 'Доступ запрещен!');
         }
 
+        /** @var Forum $forum */
         $forum = Forum::query()->with('children')->find($id);
 
         if (! $forum) {
@@ -85,15 +93,14 @@ class ForumController extends AdminController
             ->orderBy('sort')
             ->get();
 
-        if (Request::isMethod('post')) {
-            $token       = check(Request::input('token'));
-            $parent      = int(Request::input('parent'));
-            $title       = check(Request::input('title'));
-            $description = check(Request::input('description'));
-            $sort        = check(Request::input('sort'));
-            $closed      = empty(Request::input('closed')) ? 0 : 1;
+        if ($request->isMethod('post')) {
+            $token       = check($request->input('token'));
+            $parent      = int($request->input('parent'));
+            $title       = check($request->input('title'));
+            $description = check($request->input('description'));
+            $sort        = check($request->input('sort'));
+            $closed      = empty($request->input('closed')) ? 0 : 1;
 
-            $validator = new Validator();
             $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
                 ->length($title, 5, 50, ['title' => 'Слишком длинное или короткое название раздела!'])
                 ->length($description, 0, 100, ['description' => 'Слишком длинное описания раздела!'])
@@ -114,9 +121,9 @@ class ForumController extends AdminController
                 ]);
 
                 setFlash('success', 'Раздел успешно отредактирован!');
-                redirect('/admin/forum');
+                redirect('/admin/forums');
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }
@@ -126,22 +133,28 @@ class ForumController extends AdminController
 
     /**
      * Удаление раздела
+     *
+     * @param int       $id
+     * @param Request   $request
+     * @param Validator $validator
+     * @return void
+     * @throws \Exception
      */
-    public function delete($id)
+    public function delete(int $id, Request $request, Validator $validator): void
     {
         if (! isAdmin(User::BOSS)) {
             abort(403, 'Доступ запрещен!');
         }
 
+        /** @var Forum $forum */
         $forum = Forum::query()->with('children')->find($id);
 
         if (! $forum) {
             abort(404, 'Данного раздела не существует!');
         }
 
-        $token = check(Request::input('token'));
+        $token = check($request->input('token'));
 
-        $validator = new Validator();
         $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
             ->true($forum->children->isEmpty(), 'Удаление невозможно! Данный раздел имеет подфорумы!');
 
@@ -159,21 +172,23 @@ class ForumController extends AdminController
             setFlash('danger', $validator->getErrors());
         }
 
-        redirect('/admin/forum');
+        redirect('/admin/forums');
     }
 
     /**
      * Пересчет данных
+     *
+     * @param Request $request
      */
-    public function restatement()
+    public function restatement(Request $request): void
     {
         if (! isAdmin(User::BOSS)) {
             abort(403, 'Доступ запрещен!');
         }
 
-        $token = check(Request::input('token'));
+        $token = check($request->input('token'));
 
-        if ($token == $_SESSION['token']) {
+        if ($token === $_SESSION['token']) {
 
             restatement('forums');
 
@@ -182,14 +197,18 @@ class ForumController extends AdminController
             setFlash('danger', 'Ошибка! Неверный идентификатор сессии, повторите действие!');
         }
 
-        redirect('/admin/forum');
+        redirect('/admin/forums');
     }
 
     /**
      * Просмотр тем раздела
+     *
+     * @param int $id
+     * @return string
      */
-    public function forum($id)
+    public function forum(int $id): string
     {
+        /** @var Forum $forum */
         $forum = Forum::query()->with('parent', 'children.lastTopic.lastPost.user')->find($id);
 
         if (! $forum) {
@@ -214,25 +233,30 @@ class ForumController extends AdminController
 
     /**
      * Редактирование темы
+     *
+     * @param int       $id
+     * @param Request   $request
+     * @param Validator $validator
+     * @return string
      */
-    public function editTopic($id)
+    public function editTopic(int $id, Request $request, Validator $validator): string
     {
+        /** @var Topic $topic */
         $topic = Topic::query()->find($id);
 
         if (! $topic) {
             abort(404, 'Данной темы не существует!');
         }
 
-        if (Request::isMethod('post')) {
+        if ($request->isMethod('post')) {
 
-            $token      = check(Request::input('token'));
-            $title      = check(Request::input('title'));
-            $note       = check(Request::input('note'));
-            $moderators = check(Request::input('moderators'));
-            $locked     = empty(Request::input('locked')) ? 0 : 1;
-            $closed     = empty(Request::input('closed')) ? 0 : 1;
+            $token      = check($request->input('token'));
+            $title      = check($request->input('title'));
+            $note       = check($request->input('note'));
+            $moderators = check($request->input('moderators'));
+            $locked     = empty($request->input('locked')) ? 0 : 1;
+            $closed     = empty($request->input('closed')) ? 0 : 1;
 
-            $validator = new Validator();
             $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
                 ->length($title, 5, 50, ['title' => 'Слишком длинное или короткое название темы!'])
                 ->length($note, 0, 250, ['note' => 'Слишком длинное объявление!']);
@@ -252,7 +276,7 @@ class ForumController extends AdminController
                 setFlash('success', 'Тема успешно отредактирована!');
                 redirect('/admin/forums/' . $topic->forum_id);
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }
@@ -262,22 +286,28 @@ class ForumController extends AdminController
 
     /**
      * Перенос темы
+     *
+     * @param int       $id
+     * @param Request   $request
+     * @param Validator $validator
+     * @return string
      */
-    public function moveTopic($id)
+    public function moveTopic(int $id, Request $request, Validator $validator): string
     {
+        /** @var Topic $topic */
         $topic = Topic::query()->find($id);
 
         if (! $topic) {
             abort(404, 'Данной темы не существует!');
         }
 
-        if (Request::isMethod('post')) {
-            $token = check(Request::input('token'));
-            $fid   = int(Request::input('fid'));
+        if ($request->isMethod('post')) {
+            $token = check($request->input('token'));
+            $fid   = int($request->input('fid'));
 
+            /** @var Forum $forum */
             $forum = Forum::query()->find($fid);
 
-            $validator = new Validator();
             $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
                 ->notEmpty($forum, ['forum' => 'Выбранного раздела не существует!']);
 
@@ -301,7 +331,7 @@ class ForumController extends AdminController
                 setFlash('success', 'Тема успешно перенесена!');
                 redirect('/admin/forums/' . $topic->forum_id);
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }
@@ -317,20 +347,25 @@ class ForumController extends AdminController
 
     /**
      * Закрытие и закрепление тем
+     *
+     * @param int     $id
+     * @param Request $request
+     * @return void
      */
-    public function actionTopic($id)
+    public function actionTopic(int $id, Request $request): void
     {
-        $page  = int(Request::input('page', 1));
-        $token = check(Request::input('token'));
-        $type  = check(Request::input('type'));
+        $page  = int($request->input('page', 1));
+        $token = check($request->input('token'));
+        $type  = check($request->input('type'));
 
+        /** @var Topic $topic */
         $topic = Topic::query()->find($id);
 
         if (! $topic) {
             abort(404, 'Данной темы не существует!');
         }
 
-        if ($token == $_SESSION['token']) {
+        if ($token === $_SESSION['token']) {
 
             switch ($type):
                 case 'closed':
@@ -379,19 +414,25 @@ class ForumController extends AdminController
 
     /**
      * Удаление тем
+     *
+     * @param int       $id
+     * @param Request   $request
+     * @param Validator $validator
+     * @return void
+     * @throws \Exception
      */
-    public function deleteTopic($id)
+    public function deleteTopic(int $id, Request $request, Validator $validator): void
     {
-        $page  = int(Request::input('page', 1));
-        $token = check(Request::input('token'));
+        $page  = int($request->input('page', 1));
+        $token = check($request->input('token'));
 
+        /** @var Topic $topic */
         $topic = Topic::query()->find($id);
 
         if (! $topic) {
             abort(404, 'Данной темы не существует!');
         }
 
-        $validator = new Validator();
         $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!');
 
         if ($validator->isValid()) {
@@ -401,7 +442,7 @@ class ForumController extends AdminController
                 return $post->files->isNotEmpty();
             });
 
-            $filtered->each(function($post) {
+            $filtered->each(function(Post $post) {
                 $post->delete();
             });
 
@@ -429,8 +470,11 @@ class ForumController extends AdminController
 
     /**
      * Просмотр темы
+     *
+     * @param int $id
+     * @return string
      */
-    public function topic($id)
+    public function topic(int $id): string
     {
         $topic = Topic::query()->where('id', $id)->with('forum.parent')->first();
 
@@ -487,25 +531,29 @@ class ForumController extends AdminController
 
     /**
      * Редактирование сообщения
+     *
+     * @param int       $id
+     * @param Request   $request
+     * @param Validator $validator
+     * @return string
      */
-    public function editPost($id)
+    public function editPost(int $id, Request $request, Validator $validator): string
     {
-        $page = int(Request::input('page', 1));
+        $page = int($request->input('page', 1));
 
+        /** @var Post $post */
         $post = Post::query()->find($id);
 
         if (! $post) {
             abort(404, 'Данного сообщения не существует!');
         }
 
-        if (Request::isMethod('post')) {
+        if ($request->isMethod('post')) {
 
-            $token   = check(Request::input('token'));
-            $msg     = check(Request::input('msg'));
-            $delfile = intar(Request::input('delfile'));
+            $token   = check($request->input('token'));
+            $msg     = check($request->input('msg'));
+            $delfile = intar($request->input('delfile'));
 
-
-            $validator = new Validator();
             $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
                 ->length($msg, 5, setting('forumtextlength'), ['msg' => 'Слишком длинное или короткое сообщение!']);
 
@@ -538,7 +586,7 @@ class ForumController extends AdminController
                 setFlash('success', 'Сообщение успешно отредактировано!');
                 redirect('/admin/topics/' . $post->topic_id . '?page=' . $page);
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }
@@ -548,13 +596,17 @@ class ForumController extends AdminController
 
     /**
      * Удаление тем
+     *
+     * @param Request   $request
+     * @param Validator $validator
+     * @return void
      */
-    public function deletePosts()
+    public function deletePosts(Request $request, Validator $validator): void
     {
-        $tid   = int(Request::input('tid'));
-        $page  = int(Request::input('page', 1));
-        $token = check(Request::input('token'));
-        $del   = intar(Request::input('del'));
+        $tid   = int($request->input('tid'));
+        $page  = int($request->input('page', 1));
+        $token = check($request->input('token'));
+        $del   = intar($request->input('del'));
 
         $topic = Topic::query()->where('id', $tid)->first();
 
@@ -562,7 +614,6 @@ class ForumController extends AdminController
             abort(404, 'Данной темы не существует!');
         }
 
-        $validator = new Validator();
         $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
             ->true($del, 'Отсутствуют выбранные сообщения для удаления!');
 
@@ -572,7 +623,7 @@ class ForumController extends AdminController
                 ->whereIn('id', $del)
                 ->get();
 
-            $posts->each(function($post) {
+            $posts->each(function(Post $post) {
                 $post->delete();
             });
 
@@ -589,9 +640,13 @@ class ForumController extends AdminController
 
     /**
      * Переадресация к последнему сообщению
+     *
+     * @return void
+     * @param $id
      */
-    public function end($id)
+    public function end(int $id): void
     {
+        /** @var Topic $topic */
         $topic = Topic::query()->find($id);
 
         if (! $topic) {

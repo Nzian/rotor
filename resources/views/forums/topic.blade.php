@@ -7,8 +7,6 @@
 @section('description', 'Обсуждение темы: '.$topic->title.' (Стр. '.$page->current.')')
 
 @section('content')
-    <h1>{{ $topic->title }}</h1>
-
     <nav>
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="/"><i class="fas fa-home"></i></a></li>
@@ -23,11 +21,13 @@
         </ol>
     </nav>
 
+    <h1>{{ $topic->title }}</h1>
+
     <a href="/topics/print/{{ $topic->id }}">Печать</a> / <a href="/topics/rss/{{ $topic->id }}">RSS-лента</a>
 
     @if (getUser())
-        @if ($topic->user->id == getUser('id') && empty($topic->closed) && getUser('point') >= setting('editforumpoint'))
-           / <a href="/topics/close/{{ $topic->id }}?token={{ $_SESSION['token'] }}">Закрыть</a>
+        @if (! $topic->closed && $topic->user->id === getUser('id') && getUser('point') >= setting('editforumpoint'))
+           / <a href="/topics/close/{{ $topic->id }}?token={{ $_SESSION['token'] }}" onclick="return confirm('Вы действительно хотите закрыть данную тему?')">Закрыть</a>
            / <a href="/topics/edit/{{ $topic->id }}">Изменить</a>
         @endif
 
@@ -108,7 +108,7 @@
                 <div class="b" id="post_{{ $data->id }}">
                     <div class="float-right text-right">
                         @if (getUser())
-                            @if (getUser('id') != $data->user_id)
+                            @if (getUser('id') !== $data->user_id)
                                 <a href="#" onclick="return postReply(this)" title="Ответить"><i class="fa fa-reply text-muted"></i></a>
 
                                 <a href="#" onclick="return postQuote(this)" title="Цитировать"><i class="fa fa-quote-right text-muted"></i></a>
@@ -116,7 +116,7 @@
                                 <a href="#" onclick="return sendComplaint(this)" data-type="{{ App\Models\Post::class }}" data-id="{{ $data->id }}" data-token="{{ $_SESSION['token'] }}" data-page="{{ $page->current }}" rel="nofollow" title="Жалоба"><i class="fa fa-bell text-muted"></i></a>
                             @endif
 
-                            @if ((getUser('id') == $data->user_id && $data->created_at + 600 > SITETIME) || $topic->isModer)
+                            @if ($topic->isModer || (getUser('id') === $data->user_id && $data->created_at + 600 > SITETIME))
                                 <a href="/posts/edit/{{ $data->id }}?page={{ $page->current }}" title="Редактировать"><i class="fa fa-pencil-alt text-muted"></i></a>
                                 @if ($topic->isModer)
                                     <input type="checkbox" name="del[]" value="{{ $data->id }}">
@@ -125,12 +125,12 @@
                         @endif
 
                         <div class="js-rating">
-                            @if (getUser() && getUser('id') != $data->user_id)
-                                <a class="post-rating-down{{ $data->vote == '-' ? ' active' : '' }}" href="#" onclick="return changeRating(this);" data-id="{{ $data->id }}" data-type="{{ App\Models\Post::class }}" data-vote="-" data-token="{{ $_SESSION['token'] }}"><i class="fa fa-minus"></i></a>
+                            @if (getUser() && getUser('id') !== $data->user_id)
+                                <a class="post-rating-down{{ $data->vote === '-' ? ' active' : '' }}" href="#" onclick="return changeRating(this);" data-id="{{ $data->id }}" data-type="{{ App\Models\Post::class }}" data-vote="-" data-token="{{ $_SESSION['token'] }}"><i class="fa fa-minus"></i></a>
                             @endif
                             <span>{!! formatNum($data->rating) !!}</span>
-                            @if (getUser() && getUser('id') != $data->user_id)
-                                <a class="post-rating-up{{ $data->vote == '+' ? ' active' : '' }}" href="#" onclick="return changeRating(this);" data-id="{{ $data->id }}" data-type="{{ App\Models\Post::class }}" data-vote="+" data-token="{{ $_SESSION['token'] }}"><i class="fa fa-plus"></i></a>
+                            @if (getUser() && getUser('id') !== $data->user_id)
+                                <a class="post-rating-up{{ $data->vote === '+' ? ' active' : '' }}" href="#" onclick="return changeRating(this);" data-id="{{ $data->id }}" data-type="{{ App\Models\Post::class }}" data-vote="+" data-token="{{ $_SESSION['token'] }}"><i class="fa fa-plus"></i></a>
                             @endif
                         </div>
                     </div>
@@ -232,7 +232,7 @@
         {!! showError('Для добавления сообщения необходимо авторизоваться') !!}
     @endif
 
-    <a href="/smiles">Смайлы</a>  /
+    <a href="/stickers">Стикеры</a>  /
     <a href="/tags">Теги</a>  /
     <a href="/rules">Правила</a> /
     <a href="/forums/top/topics">Топ тем</a> /

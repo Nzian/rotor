@@ -1,6 +1,6 @@
 <?php
 
-use App\Classes\{BBCode, Metrika, Registry, Request};
+use App\Classes\{BBCode, Metrika, Registry, CloudFlare};
 use App\Models\{
     Antimat,
     Ban,
@@ -23,7 +23,7 @@ use App\Models\{
     Post,
     RekUser,
     Setting,
-    Smile,
+    Sticker,
     Spam,
     Topic,
     User,
@@ -31,6 +31,9 @@ use App\Models\{
 };
 use Curl\Curl;
 use Illuminate\Database\Capsule\Manager as DB;
+use Illuminate\Http\Request;
+use Illuminate\Support\Str;
+use Intervention\Image\Constraint;
 use Intervention\Image\ImageManagerStatic as Image;
 use Jenssegers\Blade\Blade;
 use ReCaptcha\ReCaptcha;
@@ -178,7 +181,7 @@ function intar($numbers)
 {
     if ($numbers) {
         if (is_array($numbers)) {
-            $numbers = array_map('intval', $numbers);
+            $numbers = array_map('\intval', $numbers);
         } else {
             $numbers = [(int) $numbers];
         }
@@ -229,11 +232,11 @@ function formatFileSize($file)
 function formatTime($time)
 {
     $units = [
-        'год,года,лет'           => 365 * 24 * 60 * 60,
-        'месяц,месяца,месяцев'   => 30 * 24 * 60 * 60,
-        'неделя,недели,недель'   => 7 * 24 * 60 * 60,
-        'день,дня,дней'          => 24 * 60 * 60,
-        'час,часа,часов'         => 60 * 60,
+        'год,года,лет'           => 31536000,
+        'месяц,месяца,месяцев'   => 2592000,
+        'неделя,недели,недель'   => 604800,
+        'день,дня,дней'          => 86400,
+        'час,часа,часов'         => 3600,
         'минута,минуты,минут'    => 60,
         'секунда,секунды,секунд' => 1,
     ];
@@ -308,7 +311,7 @@ function makeCalendar($month, $year)
                 $row[] = $n;
                 $notEmpty = true;
             } else {
-                $row[] = '';
+                $row[] = null;
             }
         }
 
@@ -329,7 +332,7 @@ function makeCalendar($month, $year)
 function getCalendar()
 {
     [$date['day'], $date['mon'], $date['year']] = explode('.', dateFixed(SITETIME, 'j.n.Y'));
-
+    $date       = array_map('\intval', $date);
     $startMonth = mktime(0, 0, 0, $date['mon'], 1);
 
     $newsDays = [];
@@ -412,8 +415,10 @@ function showCounter()
     $metrika = new Metrika();
     $metrika->saveStatistic();
 
+    $count = statsCounter();
+
     if (setting('incount') > 0) {
-        return view('app/_counter', ['count' => statsCounter()]);
+        return view('app/_counter', compact('count'));
     }
 
     return null;
@@ -573,13 +578,13 @@ function statsAntimat()
 }
 
 /**
- * Возвращает количество смайлов
+ * Возвращает количество стикеров
  *
- * @return int количество смайлов
+ * @return int количество стикеров
  */
-function statsSmiles()
+function statsStickers()
 {
-    return Smile::query()->count();
+    return Sticker::query()->count();
 }
 
 /**
@@ -771,19 +776,30 @@ function statsBoard()
 /**
  * Обфусцирует email
  *
- * @param  string $mail email
+ * @param  string $email email
  * @return string       обфусцированный email
  */
-function cryptMail($mail)
+function cryptMail($email)
 {
     $output  = '';
-    $symbols = str_split($mail);
+    $symbols = str_split($email);
 
     foreach ($symbols as $symbol) {
         $output  .= '&#' . ord($symbol) . ';';
     }
 
     return $output;
+}
+
+/**
+ * Частично скрывает email
+ *
+ * @param  string $email
+ * @return string
+ */
+function hideMail($email)
+{
+    return preg_replace('/(?<=.).(?=.*@)/u', '*', $email);
 }
 
 /**
@@ -873,6 +889,7 @@ function checkAuth()
 {
     if (isset($_SESSION['id'], $_SESSION['password'])) {
 
+        /** @var User $user */
         $user = User::query()->find($_SESSION['id']);
 
         if ($user && $_SESSION['password'] === md5(env('APP_KEY') . $user->password)) {
@@ -996,12 +1013,13 @@ function shuffleAssoc(&$array)
 /**
  * Возвращает обрезанную до заданного количества слов строку
  *
- * @param  string  $str   Исходная строка
- * @param  int     $words Максимальное количество слов в результате
+ * @param  string $str   Исходная строка
+ * @param  int    $words Максимальное количество слов в результате
+ * @param  string $end
  * @return string         Обрезанная строка
  */
-function stripString($str, $words = 20) {
-    return implode(' ', array_slice(explode(' ', strip_tags($str)), 0, $words));
+function stripString($str, $words = 20, $end = '...') {
+    return Str::words(strip_tags($str), $words, $end);
 }
 
 /**
@@ -1204,7 +1222,7 @@ function recentBoards($show = 5)
 
 
 /**
- *  Возвращает количество предложений и проблем
+ * Возвращает количество предложений и проблем
  *
  * @return string количество предложений и проблем
  */
@@ -1231,35 +1249,39 @@ function restatement($mode)
 {
     switch ($mode) {
         case 'forums':
-            DB::update('update topics set count_posts = (select count(*) from posts where topics.id = posts.topic_id)');
-            DB::update('update forums set count_topics = (select count(*) from topics where forums.id = topics.forum_id)');
-            DB::update('update forums set count_posts = (select ifnull(sum(count_posts), 0) from topics where forums.id = topics.forum_id)');
+            DB::connection()->update('update topics set count_posts = (select count(*) from posts where topics.id = posts.topic_id)');
+            DB::connection()->update('update forums set count_topics = (select count(*) from topics where forums.id = topics.forum_id)');
+            DB::connection()->update('update forums set count_posts = (select ifnull(sum(count_posts), 0) from topics where forums.id = topics.forum_id)');
             break;
 
         case 'blogs':
-            DB::update('update categories set count_blogs = (select count(*) from blogs where categories.id = blogs.category_id)');
-            DB::update('update blogs set count_comments = (select count(*) from comments where relate_type = "' . addslashes(Blog::class) . '" and blogs.id = comments.relate_id)');
+            DB::connection()->update('update categories set count_blogs = (select count(*) from blogs where categories.id = blogs.category_id)');
+            DB::connection()->update('update blogs set count_comments = (select count(*) from comments where relate_type = "' . addslashes(Blog::class) . '" and blogs.id = comments.relate_id)');
             break;
 
         case 'loads':
-            DB::update('update loads set count_downs = (select count(*) from downs where loads.id = downs.category_id and active = ?)', [1]);
-            DB::update('update downs set count_comments = (select count(*) from comments where relate_type = "' . addslashes(Down::class) . '" and downs.id = comments.relate_id)');
+            DB::connection()->update('update loads set count_downs = (select count(*) from downs where loads.id = downs.category_id and active = ?)', [1]);
+            DB::connection()->update('update downs set count_comments = (select count(*) from comments where relate_type = "' . addslashes(Down::class) . '" and downs.id = comments.relate_id)');
             break;
 
         case 'news':
-            DB::update('update news set count_comments = (select count(*) from comments where relate_type = "' . addslashes(News::class) . '" and news.id = comments.relate_id)');
+            DB::connection()->update('update news set count_comments = (select count(*) from comments where relate_type = "' . addslashes(News::class) . '" and news.id = comments.relate_id)');
             break;
 
         case 'photos':
-            DB::update('update photos set count_comments = (select count(*) from comments where relate_type=  "' . addslashes(Photo::class) . '" and photos.id = comments.relate_id)');
+            DB::connection()->update('update photos set count_comments = (select count(*) from comments where relate_type=  "' . addslashes(Photo::class) . '" and photos.id = comments.relate_id)');
             break;
 
         case 'offers':
-            DB::update('update offers set count_comments = (select count(*) from comments where relate_type=  "' . addslashes(Offer::class) . '" and offers.id = comments.relate_id)');
+            DB::connection()->update('update offers set count_comments = (select count(*) from comments where relate_type=  "' . addslashes(Offer::class) . '" and offers.id = comments.relate_id)');
             break;
 
         case 'boards':
-            DB::update('update boards set count_items = (select count(*) from items where boards.id = items.board_id and items.expires_at > ' . SITETIME . ');');
+            DB::connection()->update('update boards set count_items = (select count(*) from items where boards.id = items.board_id and items.expires_at > ' . SITETIME . ');');
+            break;
+
+        case 'votes':
+            DB::connection()->update('update votes set count = (select ifnull(sum(result), 0) from voteanswer where votes.id = voteanswer.vote_id)');
             break;
     }
 }
@@ -1373,7 +1395,7 @@ function resizeProcess($path, array $params = [])
     if (! file_exists(UPLOADS . '/thumbnails/' . $thumb)) {
 
         $img = Image::make(HOME . $path);
-        $img->resize($params['width'], $params['width'], function ($constraint) {
+        $img->resize($params['width'], $params['width'], function (Constraint $constraint) {
             $constraint->aspectRatio();
             $constraint->upsize();
         });
@@ -1394,7 +1416,7 @@ function resizeProcess($path, array $params = [])
 }
 
 /**
- * Выводит уменьшенное изображение
+ * Возвращает уменьшенное изображение
  *
  * @param  string $path   путь к изображению
  * @param  array  $params параметры изображения
@@ -1436,19 +1458,22 @@ function deleteDir($dir)
  * Удаляет файл и превью
  *
  * @param string $path путь к файлу
+ * @param bool   $thumbDelete
  * @return bool
  */
-function deleteFile($path)
+function deleteFile($path, $thumbDelete = true)
 {
     if (file_exists($path) && is_file($path)) {
         unlink($path);
     }
 
-    $thumb = ltrim(str_replace([HOME, '/'], ['', '_'], $path), '_');
-    $thumb = UPLOADS . '/thumbnails/' . $thumb;
+    if ($thumbDelete) {
+        $thumb = ltrim(str_replace([HOME, '/'], ['', '_'], $path), '_');
+        $thumb = UPLOADS . '/thumbnails/' . $thumb;
 
-    if (file_exists($thumb) && is_file($thumb)) {
-        unlink($thumb);
+        if (file_exists($thumb) && is_file($thumb)) {
+            unlink($thumb);
+        }
     }
 
     return true;
@@ -1464,7 +1489,7 @@ function deleteFile($path)
 function sendNotify(string $text, string $pageUrl, string $pageName)
 {
     /*$parseText = preg_replace('|\[quote(.*?)\](.*?)\[/quote\]|s', '', $text);*/
-    preg_match_all('|@([\w\-]+)|', $text, $matches);
+    preg_match_all('/(?<=^|\s)@([\w\-]+)/', $text, $matches);
 
     if (! empty($matches[1])) {
         $usersAnswer = array_unique(array_diff($matches[1], [getUser('login')]));
@@ -1472,7 +1497,7 @@ function sendNotify(string $text, string $pageUrl, string $pageName)
         foreach ($usersAnswer as $login) {
             $user = getUserByLogin($login);
             if ($user && $user->notify) {
-                $user->sendMessage(null, 'Пользователь ' . getUser()->getProfile() . ' упомянул вас на странице [url=' . $pageUrl . ']' . $pageName . '[/url]' . PHP_EOL . 'Текст сообщения: ' . $text);
+                $user->sendMessage(null, 'Пользователь @' . (getUser('login') ?? setting('guestsuser')) . ' упомянул вас на странице [url=' . $pageUrl . ']' . $pageName . '[/url]' . PHP_EOL . 'Текст сообщения: ' . $text);
             }
         }
     }
@@ -1501,7 +1526,7 @@ function textNotice($type, array $replace = [])
 }
 
 /**
- * Выводит блок статистики производительности
+ * Возвращает блок статистики производительности
  *
  * @return string статистика производительности
  */
@@ -1518,24 +1543,27 @@ function performance()
 /**
  * Очистка кеш-файлов
  *
+ * @param string $filename
  * @return bool результат выполнения
  */
-function clearCache()
+function clearCache(string $filename = null)
 {
+    if ($filename) {
+        return deleteFile(STORAGE . '/temp/' . $filename . '.dat', false);
+    }
+
     $files = glob(STORAGE . '/temp/*.dat');
     $files = array_diff($files, [
         STORAGE . '/temp/checker.dat',
-        STORAGE . '/temp/counter7.dat'
+        STORAGE . '/temp/counter7.dat',
+        STORAGE . '/temp/ipban.dat'
     ]);
 
     if ($files) {
         foreach ($files as $file) {
-            unlink ($file);
+            unlink($file);
         }
     }
-
-    // Авто-кэширование данных
-    ipBan(true);
 
     return true;
 }
@@ -1548,10 +1576,12 @@ function clearCache()
  */
 function returnUrl($url = null)
 {
-    if (Request::is('/', 'login', 'register', 'recovery', 'restore', 'ban', 'closed')) {
+    $request = Request::createFromGlobals();
+
+    if ($request->is('/', 'login', 'register', 'recovery', 'restore', 'ban', 'closed')) {
         return false;
     }
-    $query = Request::has('return') ? Request::input('return') : Request::path();
+    $query = $request->has('return') ? $request->input('return') : $request->path();
     return '?return=' . urlencode(! $url ? $query : $url);
 }
 
@@ -1562,8 +1592,9 @@ function returnUrl($url = null)
  * @param  array  $params массив параметров
  * @return string         сформированный код
  */
-function view($view, array $params = [])
+function view($view, array $params = []): string
 {
+
     $blade = new Blade([
         HOME . '/themes/' . setting('themes') . '/views',
         RESOURCES . '/views',
@@ -1571,6 +1602,12 @@ function view($view, array $params = [])
     ], STORAGE . '/caches');
 
     $blade->compiler()->withoutDoubleEncoding();
+
+    if (strpos($view, '::') !== false) {
+        [$namespace] = explode('::', $view);
+        /** @var Illuminate\View\Factory $blade */
+        $blade->addNamespace($namespace, APP . '/Modules/' . $namespace . '/resources/views');
+    }
 
     return $blade->render($view, $params);
 }
@@ -1584,20 +1621,28 @@ function view($view, array $params = [])
  */
 function abort($code, $message = null)
 {
-    if ($code === 403) {
-        header($_SERVER['SERVER_PROTOCOL'] . ' 403 Forbidden');
-    }
+    $request  = Request::createFromGlobals();
+    $protocol = server('SERVER_PROTOCOL');
+    $referer  = server('HTTP_REFERER') ?? null;
 
-    if ($code === 404) {
-        header($_SERVER['SERVER_PROTOCOL'] . ' 404 Not Found');
-    }
+   switch ($code) {
+       case 403:
+           header($protocol . ' 403 Forbidden');
+           break;
+       case 404:
+           header($protocol . ' 404 Not Found');
+           break;
+       case 405:
+           header($protocol . ' 405 Method Not Allowed');
+           break;
+   }
 
-    if (setting('errorlog') && in_array($code, [403, 404], true)) {
+    if (setting('errorlog') && in_array($code, [403, 404, 405], true)) {
 
         Error::query()->create([
             'code'       => $code,
             'request'    => utfSubstr(server('REQUEST_URI'), 0, 200),
-            'referer'    => utfSubstr(server('HTTP_REFERER'), 0, 200),
+            'referer'    => utfSubstr($referer, 0, 200),
             'user_id'    => getUser('id'),
             'ip'         => getIp(),
             'brow'       => getBrowser(),
@@ -1605,8 +1650,8 @@ function abort($code, $message = null)
         ]);
     }
 
-    if (Request::ajax()) {
-        header($_SERVER['SERVER_PROTOCOL'] . ' 200 OK');
+    if ($request->ajax()) {
+        header($protocol . ' 200 OK');
 
         exit(json_encode([
             'status' => 'error',
@@ -1614,7 +1659,6 @@ function abort($code, $message = null)
         ]));
     }
 
-    $referer = Request::header('referer') ?? null;
     exit(view('errors/' . $code, compact('message', 'referer')));
 }
 
@@ -1681,7 +1725,7 @@ function setInput(array $data)
  *
  * @param string $name имя поля
  * @param string $default
- * @return string сохраненный текст
+ * @return mixed сохраненное значение
  */
 function getInput($name, $default = null)
 {
@@ -1730,7 +1774,7 @@ function textError($field)
 }
 
 /**
- * Отправка уведомления на email
+ * Отправляет уведомления на email
  *
  * @param  mixed   $to      Получатель
  * @param  string  $subject Тема письма
@@ -1749,8 +1793,7 @@ function sendMail($to, $subject, $body, array $params = [])
         ->setSubject($subject)
         ->setBody($body, 'text/html')
         ->setFrom($params['from'])
-        ->setReturnPath(env('SITE_EMAIL'))
-        ->setBody($body, 'text/html');
+        ->setReturnPath(env('SITE_EMAIL'));
 
     if (env('MAIL_DRIVER') === 'smtp') {
         $transport = (new Swift_SmtpTransport())
@@ -1848,7 +1891,7 @@ function bbCode($text, $parse = true)
     }
 
     $text = $bbCode->parse($text);
-    $text = $bbCode->parseSmiles($text);
+    $text = $bbCode->parseStickers($text);
 
     return $text;
 }
@@ -1860,7 +1903,9 @@ function bbCode($text, $parse = true)
  */
 function getIp()
 {
-    $ip = Request::ip();
+    $cf = new CloudFlare();
+    $ip = $cf->ip();
+
     return $ip === '::1' ? '127.0.0.1' : $ip;
 }
 
@@ -1891,7 +1936,8 @@ function getBrowser($userAgent = null)
  */
 function server($key = null, $default = null)
 {
-    $server = Request::server($key, $default);
+    $request = Request::createFromGlobals();
+    $server  = $request->server($key, $default);
 
     if ($key === 'REQUEST_URI') {
         $server = urldecode($server);
@@ -1921,7 +1967,7 @@ function getUserByLogin($login): ?User
  * @param  int       $id ID пользователя
  * @return \Illuminate\Database\Eloquent\Builder|\Illuminate\Database\Eloquent\Model|null
  */
-function getUserById($id): ?User
+function getUserById(int $id): ?User
 {
     return User::query()->find($id);
 }
@@ -1930,16 +1976,19 @@ function getUserById($id): ?User
  * Возвращает данные пользователя по ключу
  *
  * @param  string $key ключ массива
- * @return \Illuminate\Database\Query\Builder|mixed
+ * @return User|mixed
  */
 function getUser($key = null)
 {
     if (Registry::has('user')) {
+
+        $user = Registry::get('user');
+
         if ($key) {
-            return Registry::get('user')[$key] ?? null;
+            return $user[$key] ?? null;
         }
 
-        return Registry::get('user');
+        return $user;
     }
 
     return null;
@@ -2034,13 +2083,14 @@ function pagination($page)
 /**
  * Обрабатывает постраничную навигацию
  *
- * @param  integer $limit элементов на страницу
- * @param  integer $total всего элементов
- * @return object         массив подготовленных данных
+ * @param  int    $limit элементов на страницу
+ * @param  int    $total всего элементов
+ * @return object        массив подготовленных данных
  */
 function paginate(int $limit, int $total)
 {
-    $current = int(Request::input('page'));
+    $request = Request::createFromGlobals();
+    $current = int($request->input('page'));
 
     if ($current < 1) {
         $current = 1;
@@ -2089,10 +2139,10 @@ function imageBase64($path, array $params = [])
  * Выводит прогресс-бар
  *
  * @param  int    $percent
- * @param  bool   $title
+ * @param  string $title
  * @return string
  */
-function progressBar($percent, $title = false)
+function progressBar($percent, $title = null)
 {
     if (! $title) {
         $title = $percent . '%';
@@ -2125,28 +2175,40 @@ function translator($fallback = 'en')
 /**
  * Translate the given message.
  *
- * @param  string  $id
+ * @param  string  $key
  * @param  array   $replace
  * @param  string  $locale
  * @return string
  */
-function trans($id, array $replace = [], $locale = null)
+function trans($key, array $replace = [], $locale = null)
 {
-    return translator()->trans($id, $replace, $locale);
+    $translator = translator();
+    if (strpos($key, '::') !== false) {
+        [$namespace] = explode('::', $key);
+        $translator->addNamespace($namespace, APP . '/Modules/' . $namespace . '/resources/lang');
+    }
+
+    return $translator->trans($key, $replace, $locale);
 }
 
 /**
  * Translates the given message based on a count.
  *
- * @param  string  $id
+ * @param  string  $key
  * @param  int|array|\Countable  $number
  * @param  array   $replace
  * @param  string  $locale
  * @return string
  */
-function trans_choice($id, $number, array $replace = [], $locale = null)
+function trans_choice($key, $number, array $replace = [], $locale = null)
 {
-    return translator()->transChoice($id, $number, $replace, $locale);
+    $translator = translator();
+    if (strpos($key, '::') !== false) {
+        [$namespace] = explode('::', $key);
+        $translator->addNamespace($namespace, APP . '/Modules/' . $namespace . '/resources/lang');
+    }
+
+    return $translator->transChoice($key, $number, $replace, $locale);
 }
 
 /**
@@ -2155,7 +2217,7 @@ function trans_choice($id, $number, array $replace = [], $locale = null)
  */
 function getQueryLog()
 {
-    $queries = DB::getQueryLog();
+    $queries = DB::connection()->getQueryLog();
     $formattedQueries = [];
     foreach ($queries as $query) {
         $prep = $query['query'];
@@ -2190,7 +2252,7 @@ function ipBan($save = false)
  * Возвращает настройки сайта по ключу
  *
  * @param  string $key ключ массива
- * @return string      данные
+ * @return mixed       данные
  */
 function setting($key = null)
 {
@@ -2216,6 +2278,7 @@ function setting($key = null)
  * Устанавливает настройки сайта
  *
  * @param array $setting массив настроек
+ * @return void
  */
 function setSetting($setting)
 {
@@ -2225,9 +2288,25 @@ function setSetting($setting)
 
 /**
  * Кеширует настройки сайта
+ *
+ * @return void
  */
-function saveSettings() {
+function saveSettings()
+{
     $settings = Setting::query()->pluck('value', 'name')->all();
+
+    $settings = array_map(function ($value) {
+        if (is_numeric($value)) {
+            return strpos($value, '.') === false ? (int) $value : (float) $value;
+        }
+
+        if ($value === '') {
+            return null;
+        }
+
+        return $value;
+    }, $settings);
+
     file_put_contents(STORAGE . '/temp/settings.dat', json_encode($settings, JSON_UNESCAPED_UNICODE), LOCK_EX);
 }
 
@@ -2283,13 +2362,15 @@ function parseVersion($version)
  */
 function captchaVerify(): bool
 {
+    $request = Request::createFromGlobals();
+
     if (setting('recaptcha_public') && setting('recaptcha_private')) {
         $recaptcha = new ReCaptcha(setting('recaptcha_private'));
-        $response = $recaptcha->verify(Request::input('g-recaptcha-response'), getIp());
+        $response = $recaptcha->verify($request->input('g-recaptcha-response'), getIp());
         return $response->isSuccess();
     }
 
-    return check(strtolower(Request::input('protect'))) === $_SESSION['protect'];
+    return check(strtolower($request->input('protect'))) === $_SESSION['protect'];
 }
 
 /**
@@ -2320,20 +2401,12 @@ function getCourses()
         @filemtime(STORAGE . '/temp/courses.dat') < time() - 3600
     ) {
         $curl = new Curl();
-        if ($xml = $curl->get('http://www.cbr.ru/scripts/XML_daily.asp')){
+        $curl->setConnectTimeout(3);
 
-            $courses = [];
-            $courses['Date'] = (string) $xml->attributes()->Date;
-
-            foreach ($xml->Valute as $item) {
-                $courses[(string) $item->CharCode] = [
-                    'name'    => (string) $item->Name,
-                    'value'   => (string) $item->Value,
-                    'nominal' => (string) $item->Nominal,
-                ];
-            }
-
-            file_put_contents(STORAGE . '/temp/courses.dat', json_encode($courses), LOCK_EX);
+        if ($query = $curl->get('https://www.cbr-xml-daily.ru/daily_json.js')) {
+            file_put_contents(STORAGE . '/temp/courses.dat', $query, LOCK_EX);
+        } else {
+           touch(STORAGE . '/temp/courses.dat', SITETIME);
         }
     }
 

@@ -2,10 +2,10 @@
 
 namespace App\Controllers\Admin;
 
-use App\Classes\Request;
 use App\Classes\Validator;
 use App\Models\Antimat;
 use App\Models\User;
+use Illuminate\Http\Request;
 
 class AntimatController extends AdminController
 {
@@ -23,14 +23,17 @@ class AntimatController extends AdminController
 
     /**
      * Главная страница
+     *
+     * @param Request   $request
+     * @param Validator $validator
+     * @return string
      */
-    public function index()
+    public function index(Request $request, Validator $validator): string
     {
-        if (Request::isMethod('post')) {
-            $token = check(Request::input('token'));
-            $word  = check(utfLower(Request::input('word')));
+        if ($request->isMethod('post')) {
+            $token = check($request->input('token'));
+            $word  = check(utfLower($request->input('word')));
 
-            $validator = new Validator();
             $validator
                 ->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
                 ->notEmpty($word, 'Вы не ввели слово для занесения в список!');
@@ -48,7 +51,7 @@ class AntimatController extends AdminController
                 redirect('/admin/antimat');
 
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }
@@ -60,13 +63,17 @@ class AntimatController extends AdminController
 
     /**
      * Удаление слова из списка
+     *
+     * @param Request   $request
+     * @param Validator $validator
+     * @return void
+     * @throws \Exception
      */
-    public function delete()
+    public function delete(Request $request, Validator $validator): void
     {
-        $token = check(Request::input('token'));
-        $id    = int(Request::input('id'));
+        $token = check($request->input('token'));
+        $id    = int($request->input('id'));
 
-        $validator = new Validator();
         $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!');
 
         $word = Antimat::query()->find($id);
@@ -86,12 +93,15 @@ class AntimatController extends AdminController
 
     /**
      * Очистка списка слов
+     *
+     * @param Request   $request
+     * @param Validator $validator
+     * @return void
      */
-    public function clear()
+    public function clear(Request $request, Validator $validator): void
     {
-        $token = check(Request::input('token'));
+        $token = check($request->input('token'));
 
-        $validator = new Validator();
         $validator
             ->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
             ->true(isAdmin(User::BOSS), 'Очищать список может только владелец!');

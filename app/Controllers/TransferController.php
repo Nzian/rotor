@@ -2,49 +2,60 @@
 
 namespace App\Controllers;
 
-use App\Classes\Request;
 use App\Classes\Validator;
 use App\Models\Transfer;
 use App\Models\User;
 use Illuminate\Database\Capsule\Manager as DB;
+use Illuminate\Http\Request;
 
 class TransferController extends BaseController
 {
+    /**
+     * @var User
+     */
     public $user;
 
     /**
      * Конструктор
+     *
+     * @param Request $request
      */
-    public function __construct()
+    public function __construct(Request $request)
     {
         parent::__construct();
 
         if (! getUser()) {
-            abort(403, 'Для совершения операций необходимо авторизоваться');
+            abort(403, 'Для совершения операций необходимо авторизоваться!');
         }
 
-        $login      = check(Request::input('user'));
+        $login      = check($request->input('user'));
         $this->user = User::query()->where('login', $login)->first();
     }
 
     /**
      * Главная страница
+     *
+     * @return string
      */
-    public function index()
+    public function index(): string
     {
         return view('transfers/index', ['user' => $this->user]);
     }
 
     /**
      * Перевод денег
+     *
+     * @param Request   $request
+     * @param Validator $validator
+     * @return void
+     * @throws \Throwable
      */
-    public function send()
+    public function send(Request $request, Validator $validator): void
     {
-        $money = int(Request::input('money'));
-        $msg   = check(Request::input('msg'));
-        $token = check(Request::input('token'));
+        $money = int($request->input('money'));
+        $msg   = check($request->input('msg'));
+        $token = check($request->input('token'));
 
-        $validator = new Validator();
         $validator
             ->equal($token, $_SESSION['token'], ['msg' => 'Неверный идентификатор сессии, повторите действие!'])
             ->true($this->user, ['user' => 'Ошибка! Пользователь не найден!'])
@@ -61,16 +72,15 @@ class TransferController extends BaseController
 
         if ($validator->isValid()) {
 
-            DB::transaction(function () use ($money, $msg) {
+            DB::connection()->transaction(function () use ($money, $msg) {
                 getUser()->decrement('money', $money);
                 $this->user->increment('money', $money);
-                $this->user->increment('newprivat');
 
                 $comment = $msg ?? 'Не указано';
-                $message = 'Пользователь [b]'.getUser('login').'[/b] перечислил вам '.plural($money, setting('moneyname')).''.PHP_EOL.'Примечание: '.$comment;
+                $message = 'Пользователь @' . getUser('login') . ' перечислил вам ' . plural($money, setting('moneyname')) . PHP_EOL . 'Примечание: ' . $comment;
 
                 // Уведомление по привату
-                $this->user->sendMessage(getUser(), $message);
+                $this->user->sendMessage(null, $message);
 
                 // Запись логов
                 Transfer::query()->create([
@@ -84,7 +94,7 @@ class TransferController extends BaseController
 
             setFlash('success', 'Перевод успешно завершен!');
         } else {
-            setInput(Request::all());
+            setInput($request->all());
             setFlash('danger', $validator->getErrors());
         }
 

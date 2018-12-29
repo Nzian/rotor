@@ -2,8 +2,31 @@
 
 namespace App\Models;
 
+use App\Traits\UploadTrait;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+
+/**
+ * Class Blog
+ *
+ * @property int id
+ * @property int category_id
+ * @property int user_id
+ * @property string title
+ * @property string text
+ * @property string tags
+ * @property int rating
+ * @property int visits
+ * @property int count_comments
+ * @property int created_at
+ * @property Collection files
+ * @property Category category
+ */
 class Blog extends BaseModel
 {
+    use UploadTrait;
 
     /**
      * Indicates if the model should be timestamped.
@@ -29,9 +52,9 @@ class Blog extends BaseModel
     /**
      * Возвращает комментарии блогов
      *
-     * @return \Illuminate\Database\Eloquent\Relations\MorphMany
+     * @return MorphMany
      */
-    public function comments()
+    public function comments(): MorphMany
     {
         return $this->morphMany(Comment::class, 'relate');
     }
@@ -40,9 +63,9 @@ class Blog extends BaseModel
      * Возвращает последнии комментарии к статье
      *
      * @param int $limit
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * @return HasMany
      */
-    public function lastComments($limit = 15)
+    public function lastComments($limit = 15): HasMany
     {
         return $this->hasMany(Comment::class, 'relate_id')
             ->where('relate_type', self::class)
@@ -52,17 +75,19 @@ class Blog extends BaseModel
     /**
      * Возвращает связь категории блога
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo
      */
-    public function category()
+    public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class, 'category_id')->withDefault();
     }
 
     /**
      * Возвращает загруженные файлы
+     *
+     * @return MorphMany
      */
-    public function files()
+    public function files(): MorphMany
     {
         return $this->morphMany(File::class, 'relate');
     }
@@ -70,11 +95,11 @@ class Blog extends BaseModel
     /**
      * Возвращает размер шрифта для облака тегов
      *
-     * @param int $count
-     * @param int $minCount
-     * @param int $maxCount
-     * @param int $minSize
-     * @param int $maxSize
+     * @param int   $count
+     * @param float $minCount
+     * @param float $maxCount
+     * @param int   $minSize
+     * @param int   $maxSize
      * @return int
      */
     public static function logTagSize($count, $minCount, $maxCount, $minSize = 10, $maxSize = 30): int
@@ -98,7 +123,7 @@ class Blog extends BaseModel
      * @return bool|null
      * @throws \Exception
      */
-    public function delete()
+    public function delete(): ?bool
     {
         $this->files->each(function($file) {
             deleteFile(HOME . $file->hash);

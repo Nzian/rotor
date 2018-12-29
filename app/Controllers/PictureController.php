@@ -2,8 +2,8 @@
 
 namespace App\Controllers;
 
-use App\Classes\Request;
 use App\Classes\Validator;
+use Illuminate\Http\Request;
 use Intervention\Image\ImageManagerStatic as Image;
 
 class PictureController extends BaseController
@@ -24,15 +24,18 @@ class PictureController extends BaseController
 
     /**
      * Главная страница
+     *
+     * @param Request   $request
+     * @param Validator $validator
+     * @return string
      */
-    public function index()
+    public function index(Request $request, Validator $validator): string
     {
-        if (Request::isMethod('post')) {
+        if ($request->isMethod('post')) {
 
-            $token = check(Request::input('token'));
-            $photo = Request::file('photo');
+            $token = check($request->input('token'));
+            $photo = $request->file('photo');
 
-            $validator = new Validator();
             $validator->equal($token, $_SESSION['token'], ['photo' => 'Неверный идентификатор сессии, повторите действие!']);
 
             $rules = [
@@ -59,7 +62,7 @@ class PictureController extends BaseController
                 $img->fit(48);
                 $img->save($avatar);
 
-                $upload = $this->user->uploadFile($photo);
+                $upload = $this->user->uploadFile($photo, false);
 
                 $this->user->picture = $upload['path'];
                 $this->user->avatar  = str_replace(HOME, '', $avatar);
@@ -69,7 +72,7 @@ class PictureController extends BaseController
                 redirect('/profile');
             }
 
-            setInput(Request::all());
+            setInput($request->all());
             setFlash('danger', $validator->getErrors());
         }
 
@@ -79,12 +82,14 @@ class PictureController extends BaseController
 
     /**
      * Удаление фотографии
+     *
+     * @param Request   $request
+     * @param Validator $validator
      */
-    public function delete()
+    public function delete(Request $request, Validator $validator): void
     {
-        $token = check(Request::input('token'));
+        $token = check($request->input('token'));
 
-        $validator = new Validator();
         $validator->equal($token, $_SESSION['token'], ['photo' => 'Неверный идентификатор сессии, повторите действие!']);
 
 

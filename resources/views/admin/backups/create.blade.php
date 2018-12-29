@@ -29,7 +29,7 @@
 
                 <?php $sheets = getInput('sheets', []); ?>
                 @foreach ($tables as $data)
-                    <?php $checked = in_array($data->Name, $sheets) ? ' checked' : ''; ?>
+                    <?php $checked = in_array($data->Name, $sheets, true) ? ' checked' : ''; ?>
 
                     <div class="form-check">
                         <label class="form-check-label">
@@ -61,13 +61,13 @@
                     {!! textError('method') !!}
                 </div>
 
-                <?php $inputLevel = getInput('level', 7); ?>
+                <?php $inputLevel = (int) getInput('level', 7); ?>
 
                 <div class="form-group">
                     <label for="level">Степень сжатия:</label>
                     <select class="form-control" id="level" name="level">
                         @foreach($levels as $key => $level)
-                            <?php $selected = ($key == $inputLevel) ? ' selected' : ''; ?>
+                            <?php $selected = ($key === $inputLevel) ? ' selected' : ''; ?>
                             <option value="{{ $key }}"{{ $selected }}>{{ $level }}</option>
                         @endforeach
                     </select>

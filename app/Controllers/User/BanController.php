@@ -2,24 +2,28 @@
 
 namespace App\Controllers\User;
 
-use App\Classes\Request;
 use App\Classes\Validator;
 use App\Controllers\BaseController;
 use App\Models\Banhist;
 use App\Models\User;
+use Illuminate\Http\Request;
 
 class BanController extends BaseController
 {
-    /*
-    * Бан пользователя
-    */
-    function ban()
+    /**
+     * Бан пользователя
+     *
+     * @param Request   $request
+     * @param Validator $validator
+     * @return string
+     */
+    public function ban(Request $request, Validator $validator): string
     {
         if (! $user = getUser()) {
             abort(403, 'Вы не авторизованы!');
         }
 
-        if ($user->level != User::BANNED) {
+        if ($user->level !== User::BANNED) {
             abort('default', 'Вы не забанены или срок бана истек!');
         }
 
@@ -40,12 +44,11 @@ class BanController extends BaseController
             ->orderBy('created_at', 'desc')
             ->first();
 
-        if ($banhist && Request::isMethod('post')) {
-            $msg = check(Request::input('msg'));
+        if ($banhist && $request->isMethod('post')) {
+            $msg = check($request->input('msg'));
 
             $sendUser = getUserById($banhist->send_user_id);
 
-            $validator = new Validator();
             $validator
                 ->true(setting('addbansend'), 'Писать объяснительные запрещено администрацией!')
                 ->true($banhist->explain, 'Ошибка! Вы уже писали объяснение!')
@@ -65,7 +68,7 @@ class BanController extends BaseController
                 setFlash('success', 'Объяснение успешно отправлено!');
                 redirect('/ban');
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }

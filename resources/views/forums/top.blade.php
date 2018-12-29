@@ -5,9 +5,6 @@
 @stop
 
 @section('content')
-
-    <h1>Топ популярных тем</h1>
-
     <nav>
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="/"><i class="fas fa-home"></i></a></li>
@@ -15,6 +12,8 @@
             <li class="breadcrumb-item active">Топ популярных тем</li>
         </ol>
     </nav>
+
+    <h1>Топ популярных тем</h1>
 
     @if ($topics->isNotEmpty())
         @foreach ($topics as $data)
@@ -24,8 +23,8 @@
             </div>
             <div>
                 {!! $data->pagination() !!}
-                Автор: {!! $data->user->getProfile(null, false) !!}<br>
-                Сообщение: {!! $data->lastPost->user->getProfile(null, false) !!} ({{ dateFixed($data->lastPost->created_at) }})
+                Автор: {{ $data->user->getName() }}<br>
+                Сообщение: {{ $data->lastPost->user->getName() }} ({{ dateFixed($data->lastPost->created_at) }})
             </div>
         @endforeach
 

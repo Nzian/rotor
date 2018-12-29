@@ -1,8 +1,8 @@
 <?php
 
-use App\Classes\Request;
 use App\Models\News;
 use App\Models\User;
+use Illuminate\Http\Request;
 
 ob_start();
 
@@ -18,6 +18,8 @@ define('DIR', rtrim($folder_level, '/'));
 
 include_once DIR . '/app/bootstrap.php';
 include_once DIR . '/app/helpers.php';
+
+$request = Request::createFromGlobals();
 
 function parsePHPModules() {
     ob_start();
@@ -73,9 +75,8 @@ $app->setVersion(VERSION);
 $wrap->setOption('configuration', DIR.'/app/migration.php');
 $wrap->setOption('parser', 'php');
 $wrap->setOption('environment', 'default');
-
-header("Content-type:text/html; charset=utf-8");
 ?>
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -94,7 +95,7 @@ header("Content-type:text/html; charset=utf-8");
 </div>
 <div class="site">
 
-    <?php if (! Request::has('act')): ?>
+    <?php if (! $request->has('act')): ?>
 
         <h1>Шаг 1 - проверка требований</h1>
 
@@ -192,7 +193,7 @@ header("Content-type:text/html; charset=utf-8");
         }
 
         if (extension_loaded('curl')) {
-            $version = getModuleSetting('curl', 'cURL Information');
+            $version = getModuleSetting('curl', 'Curl Information');
             echo '<i class="fa fa-plus-circle"></i> Библиотека Curl ('.$version.'): <b><span style="color:#00cc00">ОК</span></b><br>';
         } else {
             echo '<i class="fa fa-minus-circle"></i> Библиотека Curl: <b><span style="color:#ffa500">Предупреждение</span></b> (Библиотека не загружена)<br>';
@@ -204,34 +205,33 @@ header("Content-type:text/html; charset=utf-8");
         echo '<br><p style="font-size: 15px; font-weight: bold">Права доступа</p>';
 
         $uploadDir = file_exists(DIR . '/public/uploads') ? DIR . '/public/uploads' : DIR . '/uploads';
+        $moduleDir = file_exists(DIR . '/public/assets/modules') ? DIR . '/public/assets/modules' : DIR . '/assets/modules';
 
         $storage = glob(DIR . '/storage/*', GLOB_ONLYDIR);
         $uploads = glob($uploadDir . '/*', GLOB_ONLYDIR);
 
-        $dirs = array_merge($storage, $uploads);
+        $dirs = array_merge($storage, $uploads, [$moduleDir]);
 
         $chmod_errors = 0;
 
         foreach ($dirs as $dir) {
+            $old = umask(0);
+            @chmod ($dir, 0777);
+            umask($old);
+
             if (is_writable($dir)) {
                 $file_status = '<span style="color:#00cc00">ОК</span>';
             } else {
-                $old = umask(0);
-                @chmod ($dir, 0777);
-                umask($old);
-                if (is_writable($dir)) {
-                    $file_status = '<span style="color:#00cc00">ОК</span>';
-                } else {
-                    $file_status = '<span style="color:#ff0000">Запрещено</span>';
-                    $chmod_errors = 1;
-                }
+                $file_status = '<span style="color:#ff0000">Запрещено</span>';
+                $chmod_errors = 1;
             }
+
             $chmod_value = @decoct(@fileperms($dir)) % 1000;
 
             echo '<i class="fa fa-check-circle"></i> '.str_replace('../', '', $dir).' <b> - ' . $file_status . '</b> (chmod ' . $chmod_value . ')<br>';
         }
 ?>
-        <br>Дополнительно можете выставить права на директории и файлы с шаблонами внутри resources/views<br><br>
+        <br>Дополнительно можете выставить права на директории и файлы с шаблонами внутри resources/views - это необходимо для редактирования шаблонов сайта<br><br>
 
         Если какой-то пункт выделен красным, необходимо зайти по FTP и выставить CHMOD разрешающую запись<br>
         Некоторые настройки являются рекомендуемыми для полной совместимости, однако скрипт способен работать даже если рекомендуемые настройки не совпадают с текущими.<br><br>
@@ -262,28 +262,28 @@ header("Content-type:text/html; charset=utf-8");
     <?php endif; ?>
 
     <?php if (env('APP_NEW')): ?>
-        <?php if (Request::input('act') === 'status'): ?>
+        <?php if ($request->input('act') === 'status'): ?>
             <h1>Шаг 2 - проверка статуса (установка)</h1>
 
             <?= nl2br($wrap->getStatus()); ?>
 
             <p><a style="font-size: 18px" href="?act=migrate">Выполнить миграции</a></p>
 
-        <?php elseif(Request::input('act') === 'migrate'): ?>
+        <?php elseif($request->input('act') === 'migrate'): ?>
             <h1>Шаг 3 - выполнение миграций (установка)</h1>
 
             <?= nl2br($wrap->getMigrate()); ?>
 
             <p><a style="font-size: 18px" href="?act=seed">Заполнить БД</a></p>
 
-        <?php elseif(Request::input('act') === 'seed'): ?>
+        <?php elseif($request->input('act') === 'seed'): ?>
 
             <h1>Шаг 4 - заполнение БД (установка)</h1>
 
             <?= nl2br($wrap->getSeed()); ?>
 
             <p><a style="font-size: 18px" href="?act=account">Создать администратора</a></p>
-        <?php elseif(Request::input('act') === 'account'): ?>
+        <?php elseif($request->input('act') === 'account'): ?>
 
             <h1>Шаг 5 - создание администратора (установка)</h1>
 
@@ -292,18 +292,19 @@ header("Content-type:text/html; charset=utf-8");
             После окончания инсталляции необходимо удалить директории <b>install</b> и <b>upgrade</b> со всем содержимым навсегда, пароль и остальные данные вы сможете поменять в своем профиле<br><br>
 
             <?php
-                $login     = check(Request::input('login'));
-                $password  = check(Request::input('password'));
-                $password2 = check(Request::input('password2'));
-                $email     = strtolower(check(Request::input('email')));
+                $login     = check($request->input('login'));
+                $password  = check($request->input('password'));
+                $password2 = check($request->input('password2'));
+                $email     = strtolower(check($request->input('email')));
             ?>
 
-            <?php if (Request::isMethod('post')): ?>
+            <?php if ($request->isMethod('post')): ?>
 
                 <?php
-                if (strlen($login) <= 20 && strlen($login) >= 3) {
+                $length = strlen($login);
+                if ($length <= 20 && $length >= 3) {
                 if (preg_match('|^[a-z0-9\-]+$|i', $login)) {
-                if ($password == $password2) {
+                if ($password === $password2) {
                 if (preg_match('#^([a-z0-9_\-\.])+\@([a-z0-9_\-\.])+(\.([a-z0-9])+)+$#', $email)) {
 
                 // Проверка логина на существование
@@ -376,7 +377,7 @@ header("Content-type:text/html; charset=utf-8");
             В поле ввода адреса сайта необходимо ввести адрес в который у вас распакован движок, если это поддомен или папка, то необходимо указать ее, к примеру http://wap.visavi.net<br><br>
 
 
-        <?php elseif (Request::input('act') === 'finish'): ?>
+        <?php elseif ($request->input('act') === 'finish'): ?>
 
             <h1>Установка завершена</h1>
 
@@ -390,16 +391,16 @@ header("Content-type:text/html; charset=utf-8");
 
     <?php else: ?>
 
-        <?php if (Request::input('act') === 'status'): ?>
+        <?php if ($request->input('act') === 'status'): ?>
 
             <h1>Шаг 2 - проверка статуса (обновление)</h1>
             <?= nl2br($wrap->getStatus()); ?>
             <a style="font-size: 18px" href="?act=migrate">Перейти к обновлению</a>
 
-        <?php elseif(Request::input('act') === 'rollback'): ?>
+        <?php elseif($request->input('act') === 'rollback'): ?>
             <?= nl2br($wrap->getRollback()); ?>
 
-        <?php elseif (Request::input('act') === 'migrate'): ?>
+        <?php elseif ($request->input('act') === 'migrate'): ?>
 
             <h1>Обновление завершено</h1>
 

@@ -2,9 +2,9 @@
 
 namespace App\Controllers\Admin;
 
-use App\Classes\Request;
 use App\Classes\Validator;
 use App\Models\User;
+use Illuminate\Http\Request;
 
 class ReglistController extends AdminController
 {
@@ -19,16 +19,19 @@ class ReglistController extends AdminController
 
     /**
      * Главная страница
+     *
+     * @param Request   $request
+     * @param Validator $validator
+     * @return string
      */
-    public function index()
+    public function index(Request $request, Validator $validator): string
     {
-        if (Request::isMethod('post')) {
-            $page   = int(Request::input('page', 1));
-            $token  = check(Request::input('token'));
-            $choice = intar(Request::input('choice'));
-            $action = check(Request::input('action'));
+        if ($request->isMethod('post')) {
+            $page   = int($request->input('page', 1));
+            $token  = check($request->input('token'));
+            $choice = intar($request->input('choice'));
+            $action = check($request->input('action'));
 
-            $validator = new Validator();
             $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
                 ->notEmpty($choice, 'Отсутствуют выбранные пользователи!')
                 ->in($action, ['yes', 'no'], ['action' => 'Необходимо выбрать действие!']);
@@ -59,7 +62,7 @@ class ReglistController extends AdminController
 
                 redirect('/admin/reglists?page=' . $page);
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }

@@ -2,6 +2,17 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+/**
+ * Class Wall
+ *
+ * @property int id
+ * @property int user_id
+ * @property int author_id
+ * @property string text
+ * @property int created_at
+ */
 class Wall extends BaseModel
 {
     /**
@@ -20,8 +31,10 @@ class Wall extends BaseModel
 
     /**
      * Возвращает связь пользователей
+     *
+     * @return BelongsTo
      */
-    public function author()
+    public function author(): BelongsTo
     {
         return $this->belongsTo(User::class, 'author_id')->withDefault();
     }

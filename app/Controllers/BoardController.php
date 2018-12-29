@@ -2,13 +2,14 @@
 
 namespace App\Controllers;
 
-use App\Classes\Request;
 use App\Classes\Validator;
 use App\Models\Board;
 use App\Models\File;
 use App\Models\Flood;
 use App\Models\Item;
 use Exception;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Request;
 
 class BoardController extends BaseController
 {
@@ -18,11 +19,12 @@ class BoardController extends BaseController
      * @param int $id
      * @return string
      */
-    public function index($id = null): string
+    public function index(int $id = null): string
     {
         $board = null;
 
         if ($id) {
+            /** @var Board $board */
             $board = Board::query()->find($id);
 
             if (! $board) {
@@ -31,7 +33,7 @@ class BoardController extends BaseController
         }
 
         $total = Item::query()
-            ->when($board, function ($query) use ($board) {
+            ->when($board, function (Builder $query) use ($board) {
                 return $query->where('board_id', $board->id);
             })
             ->where('expires_at', '>', SITETIME)
@@ -40,7 +42,7 @@ class BoardController extends BaseController
         $page = paginate(10, $total);
 
         $items = Item::query()
-            ->when($board, function ($query) use ($board) {
+            ->when($board, function (Builder $query) use ($board) {
                 return $query->where('board_id', $board->id);
             })
             ->where('expires_at', '>', SITETIME)
@@ -63,8 +65,9 @@ class BoardController extends BaseController
      * @param int $id
      * @return string
      */
-    public function view($id): string
+    public function view(int $id): string
     {
+        /** @var Item $item */
         $item = Item::query()
             ->with('category')
             ->find($id);
@@ -83,11 +86,13 @@ class BoardController extends BaseController
     /**
      * Создание объявления
      *
+     * @param Request   $request
+     * @param Validator $validator
      * @return string
      */
-    public function create(): string
+    public function create(Request $request, Validator $validator): string
     {
-        $bid = int(Request::input('bid'));
+        $bid = int($request->input('bid'));
 
         if (! $user = getUser()) {
             abort(403);
@@ -103,23 +108,23 @@ class BoardController extends BaseController
             abort('default', 'Разделы объявлений еще не созданы!');
         }
 
-        if (Request::isMethod('post')) {
+        if ($request->isMethod('post')) {
 
-            $token = check(Request::input('token'));
-            $title = check(Request::input('title'));
-            $text  = check(Request::input('text'));
-            $price = int(Request::input('price'));
-            $phone = preg_replace('/\D/', '', Request::input('phone'));
+            $token = check($request->input('token'));
+            $title = check($request->input('title'));
+            $text  = check($request->input('text'));
+            $price = int($request->input('price'));
+            $phone = preg_replace('/\D/', '', $request->input('phone'));
 
+            /** @var Board $board */
             $board = Board::query()->find($bid);
 
-            $validator = new Validator();
             $validator
-                ->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
-                ->length($title, 5, 50, ['title' => 'Слишком длинное или короткое название!'])
-                ->length($text, 50, 5000, ['text' => 'Слишком длинный или короткий текст описания!'])
-                ->regex($phone, '#^\d{11}$#', ['phone' => 'Недопустимый формат телефона. Пример: 8-900-123-45-67!'], false)
-                ->true(Flood::isFlood(), ['text' => 'Антифлуд! Разрешается добавлять объявления раз в ' . Flood::getPeriod() . ' секунд!'])
+                ->equal($token, $_SESSION['token'], trans('validator.token'))
+                ->length($title, 5, 50, ['title' => trans('validator.name')])
+                ->length($text, 50, 5000, ['text' => trans('validator.text')])
+                ->regex($phone, '#^\d{11}$#', ['phone' => trans('validator.phone')], false)
+                ->true(Flood::isFlood(), ['text' =>  trans('validator.flood', ['sec' => Flood::getPeriod()])])
                 ->notEmpty($board, ['category' => 'Категории для данного объявления не существует!']);
 
             if ($board) {
@@ -128,6 +133,7 @@ class BoardController extends BaseController
 
             if ($validator->isValid()) {
 
+                /** @var Item $item */
                 $item = Item::query()->create([
                     'board_id'   => $board->id,
                     'title'      => $title,
@@ -151,7 +157,7 @@ class BoardController extends BaseController
                 setFlash('success', 'Объявления успешно добавлено!');
                 redirect('/items/' . $item->id);
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }
@@ -168,37 +174,40 @@ class BoardController extends BaseController
     /**
      * Редактирование объявления
      *
-     * @param int $id
+     * @param int       $id
+     * @param Request   $request
+     * @param Validator $validator
      * @return string
      */
-    public function edit($id): string
+    public function edit(int $id, Request $request, Validator $validator): string
     {
         if (! getUser()) {
-            abort(403, 'Для редактирования объявления необходимо авторизоваться');
+            abort(403, 'Для редактирования объявления необходимо авторизоваться!');
         }
 
+        /** @var Item $item */
         $item = Item::query()->find($id);
 
         if (! $item) {
             abort(404, 'Данного объявления не существует!');
         }
 
-        if (Request::isMethod('post')) {
-            $token = check(Request::input('token'));
-            $bid   = int(Request::input('bid'));
-            $title = check(Request::input('title'));
-            $text  = check(Request::input('text'));
-            $price = check(Request::input('price'));
-            $phone = preg_replace('/\D/', '', Request::input('phone'));
+        if ($request->isMethod('post')) {
+            $token = check($request->input('token'));
+            $bid   = int($request->input('bid'));
+            $title = check($request->input('title'));
+            $text  = check($request->input('text'));
+            $price = check($request->input('price'));
+            $phone = preg_replace('/\D/', '', $request->input('phone'));
 
+            /** @var Board $board */
             $board = Board::query()->find($bid);
 
-            $validator = new Validator();
             $validator
-                ->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
-                ->length($title, 5, 50, ['title' => 'Слишком длинное или короткое название!'])
-                ->length($text, 50, 5000, ['text' => 'Слишком длинный или короткий текст описания!'])
-                ->regex($phone, '#^\d{11}$#', ['phone' => 'Недопустимый формат телефона. Пример: 8-900-123-45-67!'], false)
+                ->equal($token, $_SESSION['token'], trans('validator.token'))
+                ->length($title, 5, 50, ['title' => trans('validator.name')])
+                ->length($text, 50, 5000, ['text' => trans('validator.text')])
+                ->regex($phone, '#^\d{11}$#', ['phone' => trans('validator.phone')], false)
                 ->notEmpty($board, ['category' => 'Категории для данного объявления не существует!'])
                 ->equal($item->user_id, getUser('id'), 'Изменение невозможно, вы не автор данного объявления!');
 
@@ -225,7 +234,7 @@ class BoardController extends BaseController
                 setFlash('success', 'Объявление успешно отредактировано!');
                 redirect('/items/' . $item->id);
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }
@@ -242,23 +251,25 @@ class BoardController extends BaseController
     /**
      * Снятие / Публикация объявления
      *
-     * @param int $id
+     * @param int       $id
+     * @param Request   $request
+     * @param Validator $validator
      */
-    public function close($id): void
+    public function close(int $id, Request $request, Validator $validator): void
     {
-        $token = check(Request::input('token'));
+        $token = check($request->input('token'));
 
         if (! getUser()) {
-            abort(403, 'Для редактирования объявления необходимо авторизоваться');
+            abort(403, 'Для редактирования объявления необходимо авторизоваться!');
         }
 
+        /** @var Item $item */
         $item = Item::query()->find($id);
 
         if (! $item) {
             abort(404, 'Данного объявления не существует!');
         }
 
-        $validator = new Validator();
         $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
             ->equal($item->user_id, getUser('id'), 'Изменение невозможно, вы не автор данного объявления!');
 
@@ -294,24 +305,26 @@ class BoardController extends BaseController
     /**
      * Удаление объявления
      *
-     * @param int $id
+     * @param int       $id
+     * @param Request   $request
+     * @param Validator $validator
      * @throws Exception
      */
-    public function delete($id): void
+    public function delete(int $id, Request $request, Validator $validator): void
     {
-        $token = check(Request::input('token'));
+        $token = check($request->input('token'));
 
         if (! getUser()) {
-            abort(403, 'Для редактирования объявления необходимо авторизоваться');
+            abort(403, 'Для редактирования объявления необходимо авторизоваться!');
         }
 
+        /** @var Item $item */
         $item = Item::query()->find($id);
 
         if (! $item) {
             abort(404, 'Данного объявления не существует!');
         }
 
-        $validator = new Validator();
         $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
             ->equal($item->user_id, getUser('id'), 'Удаление невозможно, вы не автор данного объявления!');
 
@@ -337,7 +350,7 @@ class BoardController extends BaseController
     public function active(): string
     {
         if (! getUser()) {
-            abort(403, 'Для просмотра своих объявлений необходимо авторизоваться');
+            abort(403, 'Для просмотра своих объявлений необходимо авторизоваться!');
         }
 
         $total = Item::query()->where('user_id', getUser('id'))->count();

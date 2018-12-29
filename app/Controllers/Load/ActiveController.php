@@ -2,11 +2,11 @@
 
 namespace App\Controllers\Load;
 
-use App\Classes\Request;
 use App\Controllers\BaseController;
 use App\Models\Comment;
 use App\Models\Down;
 use App\Models\User;
+use Illuminate\Http\Request;
 
 class ActiveController extends BaseController
 {
@@ -14,13 +14,14 @@ class ActiveController extends BaseController
 
     /**
      * Конструктор
+     *
+     * @param Request $request
      */
-    public function __construct()
+    public function __construct(Request $request)
     {
         parent::__construct();
 
-        $login = check(Request::input('user', getUser('login')));
-
+        $login      = check($request->input('user', getUser('login')));
         $this->user = User::query()->where('login', $login)->first();
 
         if (! $this->user) {
@@ -30,13 +31,16 @@ class ActiveController extends BaseController
 
     /**
      * Мои файлы
+     *
+     * @param Request $request
+     * @return string
      */
-    public function files()
+    public function files(Request $request): string
     {
-        $active = check(Request::input('active', 1));
+        $active = int($request->input('active', 1));
         $user   = $this->user;
 
-        if ($user->id != getUser('id')) {
+        if ($user->id !== getUser('id')) {
             $active = 1;
         }
 
@@ -62,11 +66,16 @@ class ActiveController extends BaseController
 
     /**
      * Мои комментарии
+     *
+     * @return string
      */
-    public function comments()
+    public function comments(): string
     {
         $user  = $this->user;
-        $total = Comment::query()->where('relate_type', Down::class)->count();
+        $total = Comment::query()
+            ->where('relate_type', Down::class)
+            ->where('user_id', $user->id)
+            ->count();
 
         if ($total > 500) {
             $total = 500;

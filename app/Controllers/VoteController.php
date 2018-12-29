@@ -2,11 +2,11 @@
 
 namespace App\Controllers;
 
-use App\Classes\Request;
 use App\Classes\Validator;
 use App\Models\Polling;
 use App\Models\Vote;
 use App\Models\VoteAnswer;
+use Illuminate\Http\Request;
 
 class VoteController extends BaseController
 {
@@ -34,13 +34,16 @@ class VoteController extends BaseController
     /**
      * Просмотр голосования
      *
-     * @param int $id
+     * @param int       $id
+     * @param Request   $request
+     * @param Validator $validator
      * @return string
      */
-    public function view($id): string
+    public function view(int $id, Request $request, Validator $validator): string
     {
-        $show = Request::input('show');
+        $show = $request->input('show');
 
+        /** @var Vote $vote */
         $vote = Vote::query()->find($id);
 
         if (! $vote) {
@@ -64,11 +67,10 @@ class VoteController extends BaseController
             ->where('user_id', getUser('id'))
             ->first();
 
-        if (Request::isMethod('post')) {
-            $token = check(Request::input('token'));
-            $poll  = int(Request::input('poll'));
+        if ($request->isMethod('post')) {
+            $token = check($request->input('token'));
+            $poll  = int($request->input('poll'));
 
-            $validator = new Validator();
             $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
                 ->empty($vote->poll, 'Вы уже проголосовали в этом опросе!')
                 ->notEmpty($poll, 'Вы не выбрали вариант ответа!');
@@ -94,7 +96,7 @@ class VoteController extends BaseController
                 setFlash('success', 'Ваш голос успешно принят!');
                 redirect('/votes/'.$vote->id);
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }
@@ -117,8 +119,9 @@ class VoteController extends BaseController
      * @param int $id
      * @return string
      */
-    public function voters($id): string
+    public function voters(int $id): string
     {
+        /** @var Vote $vote */
         $vote = Vote::query()->find($id);
 
         if (! $vote) {
@@ -162,8 +165,9 @@ class VoteController extends BaseController
      * @param int $id
      * @return string
      */
-    public function viewHistory($id): string
+    public function viewHistory(int $id): string
     {
+        /** @var Vote $vote */
         $vote = Vote::query()->find($id);
 
         if (! $vote) {
@@ -198,17 +202,18 @@ class VoteController extends BaseController
     /**
      * Создание голосования
      *
+     * @param Request   $request
+     * @param Validator $validator
      * @return string
      */
-    public function create(): string
+    public function create(Request $request, Validator $validator): string
     {
-        if (Request::isMethod('post')) {
+        if ($request->isMethod('post')) {
 
-            $token    = check(Request::input('token'));
-            $question = check(Request::input('question'));
-            $answers  = check(Request::input('answer'));
+            $token    = check($request->input('token'));
+            $question = check($request->input('question'));
+            $answers  = check($request->input('answer'));
 
-            $validator = new Validator();
             $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
                 ->length($question, 5, 100, ['question' => 'Слишком длинный или короткий текст вопроса!']);
 
@@ -221,10 +226,11 @@ class VoteController extends BaseController
                 }
             }
 
-            $validator->between(count($answers), 2, 10, ['answer' => 'Недостаточное количество вариантов ответов!']);
+            $validator->between(\count($answers), 2, 10, ['answer' => 'Недостаточное количество вариантов ответов!']);
 
             if ($validator->isValid()) {
 
+                /** @var Vote $vote */
                 $vote = Vote::query()->create([
                     'title'      => $question,
                     'created_at' => SITETIME,
@@ -243,7 +249,7 @@ class VoteController extends BaseController
                 setFlash('success', 'Голосование успешно создано!');
                 redirect('/votes/' . $vote->id);
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }

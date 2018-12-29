@@ -5,6 +5,12 @@
 @stop
 
 @section('content')
+    <nav>
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/"><i class="fas fa-home"></i></a></li>
+            <li class="breadcrumb-item active">Форум</li>
+        </ol>
+    </nav>
 
     @if (getUser())
         <div class="float-right">
@@ -15,13 +21,6 @@
     <h1>Форум {{ setting('title') }}</h1>
 
     @include('advert/_forum')
-
-    <nav>
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="/"><i class="fas fa-home"></i></a></li>
-            <li class="breadcrumb-item active">Форум</li>
-        </ol>
-    </nav>
 
     @if (getUser())
         Мои: <a href="/forums/active/topics">темы</a>, <a href="/forums/active/posts">сообщения</a>, <a href="/forums/bookmarks">закладки</a> /
@@ -53,7 +52,7 @@
                 @if ($forum->lastTopic->lastPost->id)
                     Тема: <a href="/topics/end/{{ $forum->lastTopic->id }}">{{ $forum->lastTopic->title }}</a>
                     <br/>
-                    Сообщение: {!! $forum->lastTopic->lastPost->user->getProfile(null, false) !!} ({{ dateFixed($forum->lastTopic->lastPost->created_at) }})
+                    Сообщение: {{ $forum->lastTopic->lastPost->user->getName() }} ({{ dateFixed($forum->lastTopic->lastPost->created_at) }})
                 @else
                     Темы еще не созданы!
                 @endif

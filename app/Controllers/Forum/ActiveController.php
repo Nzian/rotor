@@ -2,12 +2,12 @@
 
 namespace App\Controllers\Forum;
 
-use App\Classes\Request;
 use App\Classes\Validator;
 use App\Controllers\BaseController;
 use App\Models\Post;
 use App\Models\Topic;
 use App\Models\User;
+use Illuminate\Http\Request;
 
 class ActiveController extends BaseController
 {
@@ -15,13 +15,14 @@ class ActiveController extends BaseController
 
     /**
      * Конструктор
+     *
+     * @param Request $request
      */
-    public function __construct()
+    public function __construct(Request $request)
     {
         parent::__construct();
 
-        $login = check(Request::input('user', getUser('login')));
-
+        $login      = check($request->input('user', getUser('login')));
         $this->user = User::query()->where('login', $login)->first();
 
         if (! $this->user) {
@@ -31,8 +32,10 @@ class ActiveController extends BaseController
 
     /**
      * Вывод тем
+     *
+     * @return string
      */
-    public function topics()
+    public function topics(): string
     {
         $user  = $this->user;
         $total = Topic::query()->where('user_id', $user->id)->count();
@@ -56,8 +59,10 @@ class ActiveController extends BaseController
 
     /**
      * Вывод сообшений
+     *
+     * @return string
      */
-    public function posts()
+    public function posts(): string
     {
         $user  = $this->user;
         $total = Post::query()->where('user_id', $user->id)->count();
@@ -81,10 +86,15 @@ class ActiveController extends BaseController
 
     /**
      * Удаление сообщений
+     *
+     * @param Request   $request
+     * @param Validator $validator
+     * @return string
+     * @throws \Exception
      */
-    public function delete()
+    public function delete(Request $request, Validator $validator): string
     {
-        if (! Request::ajax()) {
+        if (! $request->ajax()) {
             redirect('/');
         }
 
@@ -92,10 +102,9 @@ class ActiveController extends BaseController
             abort(403, 'Удалять сообщения могут только модераторы!');
         }
 
-        $token = check(Request::input('token'));
-        $tid   = int(Request::input('tid'));
+        $token = check($request->input('token'));
+        $tid   = int($request->input('tid'));
 
-        $validator = new Validator();
         $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!');
 
         $post = Post::query()
@@ -111,10 +120,10 @@ class ActiveController extends BaseController
             $post->topic->decrement('count_posts');
             $post->topic->forum->decrement('count_posts');
 
-            exit(json_encode(['status' => 'success']));
-        } else {
-            exit(json_encode(['status' => 'error', 'message' => current($validator->getErrors())]));
+            return json_encode(['status' => 'success']);
         }
+
+        return json_encode(['status' => 'error', 'message' => current($validator->getErrors())]);
     }
 }
 

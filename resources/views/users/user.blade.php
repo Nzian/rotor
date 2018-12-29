@@ -21,7 +21,10 @@
     </nav>
 
     @if ($user->level === 'pended')
-        <b><span style="color:#ff0000">Внимание, аккаунт требует подтверждение регистрации!</span></b><br>
+        <div class="p-1 bg-danger text-white">
+            <i class="fas fa-exclamation-triangle"></i>
+            Внимание, аккаунт требует подтверждение регистрации!
+        </div>
     @endif
 
     @if ($user->level === 'banned' && $user->timeban > SITETIME)
@@ -121,7 +124,7 @@
                 <b><a href="/forums/active/topics?user={{ $user->login }}">Форум</a></b> (<a href="/forums/active/posts?user={{ $user->login }}">Сообщ.</a>) /
                 <b><a href="/downs/active/files?user={{ $user->login }}">Загрузки</a></b> (<a href="/downs/active/comments?user={{ $user->login }}">комм.</a>) /
                 <b><a href="/blogs/active/articles?user={{ $user->login }}">Блоги</a></b> (<a href="/blogs/active/comments?user={{ $user->login }}">комм.</a>) /
-                <b><a href="/photos/albums/{{ $user->login }}">Галерея</a></b> (<a href="/photos/comments/{{ $user->login }}">комм.</a>)<br>
+                <b><a href="/photos/albums/{{ $user->login }}">Галерея</a></b> (<a href="/photos/comments/active/{{ $user->login }}">комм.</a>)<br>
             </div>
         </div>
     </div>
@@ -143,33 +146,32 @@
     <div class="alert alert-info">
         <i class="fa fa-sticky-note"></i> <a href="/walls/{{ $user->login }}">Стена сообщений</a> ({{ $user->getCountWall() }})<br>
 
+        @if (!empty($user->site))
+            <i class="fa fa-home"></i> <a href="{{ $user->site }}">Перейти на сайт {{ $user->login }}</a><br>
+        @endif
+
         @if ($user->login !== getUser('login'))
             <i class="fa fa-address-book"></i> Добавить в
-            <a href="/contacts?act=add&amp;user={{ $user->login }}&amp;token={{ $_SESSION['token'] }}">контакт</a> /
-            <a href="/ignores?act=add&amp;user={{ $user->login }}&amp;token={{ $_SESSION['token'] }}">игнор</a><br>
-            <i class="fa fa-envelope"></i> <a href="/messages/send?user={{ $user->login }}">Отправить сообщение</a><br>
-
+            <a href="/contacts?user={{ $user->login }}">контакт</a> /
+            <a href="/ignores?user={{ $user->login }}">игнор</a><br>
+            <i class="fa fa-envelope"></i> <a href="/messages/talk/{{ $user->login }}">Отправить сообщение</a><br>
             <i class="fa fa-money-bill-alt"></i> <a href="/transfers?user={{ $user->login }}">Перечислить денег</a><br>
-
-            @if (!empty($user->site))
-                <i class="fa fa-home"></i> <a href="{{ $user->site }}">Перейти на сайт {{ $user->login }}</a><br>
-            @endif
 
             @if (isAdmin('moder'))
                 @if (setting('invite'))
                     <i class="fa fa-ban"></i> <a href="/admin/invitations/send?user={{ $user->login }}&amp;token={{ $_SESSION['token'] }}">Отправить инвайт</a><br>
                 @endif
             <i class="fa fa-ban"></i> <a href="/admin/bans/edit?user={{ $user->login }}">Бан / Разбан</a><br>
-            <i class="fa fa-history"></i> <a href="/banhists/view?user={{ $user->login }}">История банов</a><br>
+            <i class="fa fa-history"></i> <a href="/admin/banhists/view?user={{ $user->login }}">История банов</a><br>
             @endif
 
-            @if (isAdmin('admin'))
+            @if (isAdmin('boss'))
                 <i class="fa fa-wrench"></i> <a href="/admin/users/edit?user={{ $user->login }}">Редактировать</a><br>
             @endif
         @else
-        <i class="fa fa-user-circle"></i> <a href="/profile">Мой профиль</a><br>
-        <i class="fa fa-cog"></i> <a href="/accounts">Мои данные</a><br>
-        <i class="fa fa-wrench"></i> <a href="/settings">Настройки</a><br>
+            <i class="fa fa-user-circle"></i> <a href="/profile">Мой профиль</a><br>
+            <i class="fa fa-cog"></i> <a href="/accounts">Мои данные</a><br>
+            <i class="fa fa-wrench"></i> <a href="/settings">Настройки</a><br>
         @endif
 
     </div>

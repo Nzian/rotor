@@ -2,9 +2,10 @@
 
 namespace App\Controllers\Admin;
 
-use App\Classes\Request;
 use App\Classes\Validator;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Http\Request;
 
 class DeliveryController extends AdminController
 {
@@ -22,16 +23,20 @@ class DeliveryController extends AdminController
 
     /**
      * Главная страница
+     *
+     * @param Request   $request
+     * @param Validator $validator
+     * @return string
      */
-    public function index()
+    public function index(Request $request, Validator $validator): string
     {
-        if (Request::isMethod('post')) {
+        if ($request->isMethod('post')) {
 
-            $token = check(Request::input('token'));
-            $msg   = check(Request::input('msg'));
-            $type  = int(Request::input('type'));
+            $token = check($request->input('token'));
+            $msg   = check($request->input('msg'));
+            $type  = int($request->input('type'));
+            $users = collect();
 
-            $validator = new Validator();
             $validator->equal($token, $_SESSION['token'], ['msg' => 'Неверный идентификатор сессии, повторите действие!'])
                 ->length($msg, 5, 1000, ['msg' => 'Слишком длинный или короткий текст комментария!'])
                 ->between($type, 1, 4, 'Вы не выбрали получаетелей рассылки!');
@@ -56,6 +61,7 @@ class DeliveryController extends AdminController
                 $users = User::query()->whereIn('level', User::USER_GROUPS)->get();
             }
 
+            /** @var Collection $users */
             $users = $users->filter(function ($value, $key) {
                 return $value->id !== getUser('id');
             });
@@ -73,7 +79,7 @@ class DeliveryController extends AdminController
                 setFlash('success', 'Сообщение успешно разослано!');
                 redirect('/admin/delivery');
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }

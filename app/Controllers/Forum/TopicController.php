@@ -11,17 +11,21 @@ use App\Models\Topic;
 use App\Models\User;
 use App\Models\Vote;
 use App\Models\Flood;
-use App\Classes\Request;
 use App\Classes\Validator;
+use App\Models\VoteAnswer;
 use Illuminate\Database\Capsule\Manager as DB;
 use Illuminate\Database\Query\JoinClause;
+use Illuminate\Http\Request;
 
 class TopicController extends BaseController
 {
     /**
      * Главная страница
+     *
+     * @param int $id
+     * @return string
      */
-    public function index($id)
+    public function index(int $id): string
     {
         $topic = Topic::query()
             ->select('topics.*', 'bookmarks.count_posts as bookmark_posts')
@@ -54,13 +58,11 @@ class TopicController extends BaseController
             ->orderBy('created_at')
             ->get();
 
-        if (getUser()) {
-            if ($topic->count_posts > $topic->bookmark_posts) {
-                Bookmark::query()
-                    ->where('topic_id', $topic->id)
-                    ->where('user_id', getUser('id'))
-                    ->update(['count_posts' => $topic->count_posts]);
-            }
+        if ($topic->count_posts > $topic->bookmark_posts && getUser()) {
+            Bookmark::query()
+                ->where('topic_id', $topic->id)
+                ->where('user_id', getUser('id'))
+                ->update(['count_posts' => $topic->count_posts]);
         }
 
         // Кураторы
@@ -96,12 +98,17 @@ class TopicController extends BaseController
 
     /**
      * Создание сообщения
+     *
+     * @param int       $id
+     * @param Request   $request
+     * @param Validator $validator
+     * @return void
      */
-    public function create($id)
+    public function create(int $id, Request $request, Validator $validator): void
     {
-        $msg   = check(Request::input('msg'));
-        $token = check(Request::input('token'));
-        $files = (array) Request::file('files');
+        $msg   = check($request->input('msg'));
+        $token = check($request->input('token'));
+        $files = (array) $request->file('files');
 
         if (! $user = getUser()) {
             abort(403, 'Авторизуйтесь для добавления сообщения!');
@@ -117,19 +124,19 @@ class TopicController extends BaseController
             abort(404, 'Выбранная вами тема не существует, возможно она была удалена!');
         }
 
-        $validator = new Validator();
         $validator->equal($token, $_SESSION['token'], ['msg' => 'Неверный идентификатор сессии, повторите действие!'])
             ->empty($topic->closed, ['msg' => 'Запрещено писать в закрытую тему!'])
             ->equal(Flood::isFlood(), true, ['msg' => 'Антифлуд! Разрешается отправлять сообщения раз в ' . Flood::getPeriod() . ' сек!'])
             ->length($msg, 5, setting('forumtextlength'), ['msg' => 'Слишком длинное или короткое сообщение!']);
 
         // Проверка сообщения на схожесть
+        /** @var Post $post */
         $post = Post::query()->where('topic_id', $topic->id)->orderBy('id', 'desc')->first();
-        $validator->notEqual($msg, $post['text'], ['msg' => 'Ваше сообщение повторяет предыдущий пост!']);
+        $validator->notEqual($msg, $post->text, ['msg' => 'Ваше сообщение повторяет предыдущий пост!']);
 
         if ($files && $validator->isValid()) {
             $validator
-                ->lte(count($files), setting('maxfiles'), ['files' => 'Разрешено загружать не более ' . setting('maxfiles') . ' файлов'])
+                ->lte(\count($files), setting('maxfiles'), ['files' => 'Разрешено загружать не более ' . setting('maxfiles') . ' файлов'])
                 ->gte(getUser('point'), setting('forumloadpoints'), 'У вас недостаточно актива для загрузки файлов!');
 
             $rules = [
@@ -151,7 +158,7 @@ class TopicController extends BaseController
                 $post->created_at + 600 > SITETIME &&
                 getUser('id') === $post->user_id &&
                 (utfStrlen($msg) + utfStrlen($post->text) <= setting('forumtextlength')) &&
-                count($files) + $post->files->count() <= setting('maxfiles')
+                \count($files) + $post->files->count() <= setting('maxfiles')
             ) {
 
                 $newpost = $post->text . "\n\n" . '[i][size=1]Добавлено через ' . makeTime(SITETIME - $post->created_at) . ' сек.[/size][/i]' . "\n" . $msg;
@@ -171,19 +178,19 @@ class TopicController extends BaseController
                 ]);
 
                 $user->update([
-                    'allforum' => DB::raw('allforum + 1'),
-                    'point'    => DB::raw('point + 1'),
-                    'money'    => DB::raw('money + 5'),
+                    'allforum' => DB::connection()->raw('allforum + 1'),
+                    'point'    => DB::connection()->raw('point + 1'),
+                    'money'    => DB::connection()->raw('money + 5'),
                 ]);
 
                 $topic->update([
-                    'count_posts'  => DB::raw('count_posts + 1'),
+                    'count_posts'  => DB::connection()->raw('count_posts + 1'),
                     'last_post_id' => $post->id,
                     'updated_at'   => SITETIME,
                 ]);
 
                 $topic->forum->update([
-                    'count_posts'   => DB::raw('count_posts + 1'),
+                    'count_posts'   => DB::connection()->raw('count_posts + 1'),
                     'last_topic_id' => $topic->id,
                 ]);
 
@@ -207,7 +214,7 @@ class TopicController extends BaseController
             setFlash('success', 'Сообщение успешно добавлено!');
 
         } else {
-            setInput(Request::all());
+            setInput($request->all());
             setFlash('danger', $validator->getErrors());
         }
 
@@ -216,22 +223,27 @@ class TopicController extends BaseController
 
     /**
      * Удаление сообщений
+     *
+     * @param int       $id
+     * @param Request   $request
+     * @param Validator $validator
+     * @return void
      */
-    public function delete($id)
+    public function delete(int $id, Request $request, Validator $validator): void
     {
-        $token = check(Request::input('token'));
-        $del   = intar(Request::input('del'));
-        $page  = int(Request::input('page'));
+        $token = check($request->input('token'));
+        $del   = intar($request->input('del'));
+        $page  = int($request->input('page'));
 
+        /** @var Topic $topic */
         $topic = Topic::query()->find($id);
 
         if (! $topic) {
             abort(404, 'Данной темы не существует!');
         }
 
-        $isModer = in_array(getUser('id'), explode(',', $topic->moderators)) ? true : false;
+        $isModer = \in_array(getUser('id'), explode(',', $topic->moderators), true) ? true : false;
 
-        $validator = new Validator();
         $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
             ->true(getUser(), 'Для закрытия тем необходимо авторизоваться')
             ->notEmpty($del, 'Отстутствуют выбранные сообщения для удаления!')
@@ -268,14 +280,19 @@ class TopicController extends BaseController
 
     /**
      * Закрытие темы
+     *
+     * @param int       $id
+     * @param Request   $request
+     * @param Validator $validator
+     * @return void
      */
-    public function close($id)
+    public function close(int $id, Request $request, Validator $validator): void
     {
-        $token = check(Request::input('token'));
+        $token = check($request->input('token'));
 
+        /** @var Topic $topic */
         $topic = Topic::query()->find($id);
 
-        $validator = new Validator();
         $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
             ->true(getUser(), 'Для закрытия тем необходимо авторизоваться')
             ->gte(getUser('point'), setting('editforumpoint'), 'Для закрытия тем вам необходимо набрать ' . plural(setting('editforumpoint'), setting('scorename')) . '!')
@@ -306,8 +323,13 @@ class TopicController extends BaseController
 
     /**
      * Редактирование темы
+     *
+     * @param int       $id
+     * @param Request   $request
+     * @param Validator $validator
+     * @return string
      */
-    public function edit($id)
+    public function edit(int $id, Request $request, Validator $validator): string
     {
         if (! getUser()) {
             abort(403, 'Авторизуйтесь для изменения темы!');
@@ -317,6 +339,7 @@ class TopicController extends BaseController
             abort('default', 'У вас недостаточно актива для изменения темы!');
         }
 
+        /** @var Topic $topic */
         $topic = Topic::query()->find($id);
 
         if (! $topic) {
@@ -335,14 +358,16 @@ class TopicController extends BaseController
             ->orderBy('id')
             ->first();
 
-        if (Request::isMethod('post')) {
+        /** @var Vote $vote */
+        $vote = Vote::query()->where('topic_id', $id)->first();
 
-            $token = check(Request::input('token'));
-            $title = check(Request::input('title'));
-            $msg   = check(Request::input('msg'));
+        if ($request->isMethod('post')) {
+            $token    = check($request->input('token'));
+            $title    = check($request->input('title'));
+            $msg      = check($request->input('msg'));
+            $question = check($request->input('question'));
+            $answers  = check((array) $request->input('answers'));
 
-
-            $validator = new Validator();
             $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
                 ->length($title, 5, 50, ['title' => 'Слишком длинное или короткое название темы!']);
 
@@ -350,8 +375,26 @@ class TopicController extends BaseController
                 $validator->length($msg, 5, setting('forumtextlength'), ['msg' => 'Слишком длинный или короткий текст сообщения!']);
             }
 
-            if ($validator->isValid()) {
+            if ($vote) {
+                $validator->length($question, 5, 100, ['question' => 'Слишком длинный или короткий текст вопроса!']);
 
+                if ($answers) {
+                    $validator->empty($vote->count, ['question' => 'Изменение вариантов ответа доступно только до голосований!']);
+
+                    $answers = array_unique(array_diff($answers, ['']));
+
+                    foreach ($answers as $answer) {
+                        if (utfStrlen($answer) > 50) {
+                            $validator->addError(['answers' => 'Длина вариантов ответа не должна быть более 50 символов!']);
+                            break;
+                        }
+                    }
+
+                    $validator->between(\count($answers), 2, 10, ['answers' => 'Недостаточное количество вариантов ответов!']);
+                }
+            }
+
+            if ($validator->isValid()) {
                 $title = antimat($title);
                 $msg   = antimat($msg);
 
@@ -365,24 +408,55 @@ class TopicController extends BaseController
                     ]);
                 }
 
+                if ($vote) {
+                    $vote->update([
+                        'title' => $question,
+                    ]);
+
+                    if ($answers) {
+                        $countAnswers = $vote->answers()->count();
+
+                        foreach ($answers as $answerId => $answer) {
+                            /** @var VoteAnswer $ans */
+                            $ans = $vote->answers()->firstOrNew(['id' => $answerId]);
+
+                            if ($ans->exists) {
+                                $ans->update(['answer' => $answer]);
+                            } else if ($countAnswers < 10) {
+                                $ans->fill(['answer' => $answer])->save();
+                                $countAnswers++;
+                            }
+                        }
+                    }
+                }
+
                 setFlash('success', 'Тема успешно изменена!');
                 redirect('/topics/' . $topic->id);
 
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }
 
-        return view('forums/topic_edit', compact('post', 'topic'));
+        if ($vote) {
+            $vote->getAnswers = $vote->answers->pluck('answer', 'id')->all();
+        }
+
+        return view('forums/topic_edit', compact('post', 'topic', 'vote'));
     }
 
     /**
      * Редактирование сообщения
+     *
+     * @param int       $id
+     * @param Request   $request
+     * @param Validator $validator
+     * @return string
      */
-    public function editPost($id)
+    public function editPost(int $id, Request $request, Validator $validator): string
     {
-        $page = int(Request::input('page'));
+        $page = int($request->input('page'));
 
         if (! getUser()) {
             abort(403, 'Авторизуйтесь для изменения сообщения!');
@@ -394,7 +468,7 @@ class TopicController extends BaseController
             ->where('posts.id', $id)
             ->first();
 
-        $isModer = in_array(getUser('id'), explode(',', $post->moderators)) ? true : false;
+        $isModer = \in_array(getUser('id'), explode(',', $post->moderators), true) ? true : false;
 
         if (! $post) {
             abort(404, 'Данного сообщения не существует!');
@@ -404,7 +478,7 @@ class TopicController extends BaseController
             abort('default', 'Редактирование невозможно, данная тема закрыта!');
         }
 
-        if (! $isModer && $post->user_id != getUser('id')) {
+        if (! $isModer && $post->user_id !== getUser('id')) {
             abort('default', 'Редактировать сообщения может только автор или кураторы темы!');
         }
 
@@ -412,13 +486,12 @@ class TopicController extends BaseController
             abort('default', 'Редактирование невозможно, прошло более 10 минут!');
         }
 
-        if (Request::isMethod('post')) {
+        if ($request->isMethod('post')) {
 
-            $token   = check(Request::input('token'));
-            $msg     = check(Request::input('msg'));
-            $delfile = intar(Request::input('delfile'));
+            $token   = check($request->input('token'));
+            $msg     = check($request->input('msg'));
+            $delfile = intar($request->input('delfile'));
 
-            $validator = new Validator();
             $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
                 ->length($msg, 5, setting('forumtextlength'), ['msg' => 'Слишком длинное или короткое сообщение!']);
 
@@ -451,7 +524,7 @@ class TopicController extends BaseController
                 setFlash('success', 'Сообщение успешно отредактировано!');
                 redirect('/topics/' . $post->topic_id . '?page=' . $page);
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }
@@ -461,8 +534,13 @@ class TopicController extends BaseController
 
     /**
      * Голосование
+     *
+     * @param int       $id
+     * @param Request   $request
+     * @param Validator $validator
+     * @return void
      */
-    public function vote($id)
+    public function vote(int $id, Request $request, Validator $validator): void
     {
         if (! getUser()) {
             abort(403, 'Авторизуйтесь для голосования!');
@@ -474,11 +552,10 @@ class TopicController extends BaseController
             abort(404, 'Голосование не найдено!');
         }
 
-        $token = check(Request::input('token'));
-        $poll  = int(Request::input('poll'));
-        $page  = int(Request::input('page'));
+        $token = check($request->input('token'));
+        $poll  = int($request->input('poll'));
+        $page  = int($request->input('page'));
 
-        $validator = new Validator();
         $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!');
 
         if ($vote->closed) {
@@ -493,6 +570,7 @@ class TopicController extends BaseController
             $validator->addError('Вы уже проголосовали в этом опросе!');
         }
 
+        /** @var VoteAnswer $voteAnswer */
         $voteAnswer = $vote->answers()
             ->where('id', $poll)
             ->where('vote_id', $vote->id)
@@ -525,9 +603,13 @@ class TopicController extends BaseController
 
     /**
      * Печать темы
+     *
+     * @param int $id
+     * @return string
      */
-    public function print($id)
+    public function print(int $id): string
     {
+        /** @var Topic $topic */
         $topic = Topic::query()->find($id);
 
         if (! $topic) {
@@ -545,8 +627,12 @@ class TopicController extends BaseController
 
     /**
      * Переход к сообщению
+     *
+     * @param int $id
+     * @param int $pid
+     * @return void
      */
-    public function viewpost($id, $pid)
+    public function viewpost(int $id, int $pid): void
     {
         $countTopics = Post::query()
             ->where('id', '<=', $pid)
@@ -563,9 +649,13 @@ class TopicController extends BaseController
 
     /**
      * Переадресация к последнему сообщению
+     *
+     * @param $id
+     * @return void
      */
-    public function end($id)
+    public function end(int $id): void
     {
+        /** @var Topic $topic */
         $topic = Topic::query()->find($id);
 
         if (! $topic) {

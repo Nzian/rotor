@@ -16,7 +16,7 @@
         </ol>
     </nav>
 
-    <a href="/smiles">Смайлы</a> /
+    <a href="/stickers">Стикеры</a> /
     <a href="/tags">Теги</a><hr>
 
     @if ($posts->isNotEmpty())
@@ -24,14 +24,14 @@
         @foreach ($posts as $post)
             <div class="post">
                 <div class="b">
-                    @if (getUser('id') != $post->user_id)
+                    @if (getUser('id') !== $post->user_id)
                         <div class="float-right">
                             <a href="#" onclick="return postReply(this)" data-toggle="tooltip" title="Ответить"><i class="fa fa-reply text-muted"></i></a>
                             <a href="#" onclick="return postQuote(this)" data-toggle="tooltip" title="Цитировать"><i class="fa fa-quote-right text-muted"></i></a>
                         </div>
                     @endif
 
-                    @if (getUser('id') == $post->user_id && $post->created_at + 600 > SITETIME)
+                    @if ($post->created_at + 600 > SITETIME && getUser('id') === $post->user_id)
                         <div class="float-right">
                             <a href="/admin/chats/edit/{{ $post->id }}?page={{ $page->current }}" title="Редактировать"><i class="fas fa-pencil-alt text-muted"></i></a>
                         </div>
@@ -74,7 +74,7 @@
         </form>
     </div><br>
 
-    @if (isAdmin('boss') && $page->total > 0)
-        <i class="fa fa-times"></i> <a href="/admin/chat/clear?token={{ $_SESSION['token'] }}" onclick="return confirm('Вы действительно хотите очистить админ-чат?')">Очистить чат</a><br>
+    @if ($page->total > 0 && isAdmin('boss'))
+        <i class="fa fa-times"></i> <a href="/admin/chats/clear?token={{ $_SESSION['token'] }}" onclick="return confirm('Вы действительно хотите очистить админ-чат?')">Очистить чат</a><br>
     @endif
 @stop

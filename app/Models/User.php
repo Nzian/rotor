@@ -2,12 +2,65 @@
 
 namespace App\Models;
 
+use App\Traits\UploadTrait;
 use Curl\Curl;
 use Illuminate\Database\Capsule\Manager as DB;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Query\JoinClause;
 
+/**
+ * Class User
+ *
+ * @property int id
+ * @property string login
+ * @property string password
+ * @property string email
+ * @property string level
+ * @property string name
+ * @property string country
+ * @property string city
+ * @property string language
+ * @property string info
+ * @property string site
+ * @property string phone
+ * @property string icq
+ * @property string skype
+ * @property string gender
+ * @property string birthday
+ * @property int visits
+ * @property int newprivat
+ * @property int newwall
+ * @property int allforum
+ * @property int allguest
+ * @property int allcomments
+ * @property string themes
+ * @property string timezone
+ * @property int point
+ * @property int money
+ * @property string status
+ * @property string avatar
+ * @property string picture
+ * @property int rating
+ * @property int posrating
+ * @property int negrating
+ * @property string keypasswd
+ * @property int timepasswd
+ * @property int sendprivatmail
+ * @property int timebonus
+ * @property string confirmregkey
+ * @property int newchat
+ * @property int notify
+ * @property string apikey
+ * @property string subscribe
+ * @property int timeban
+ * @property int updated_at
+ * @property int created_at
+ */
 class User extends BaseModel
 {
+    use UploadTrait;
+
     public const BOSS   = 'boss';   // Владелец
     public const ADMIN  = 'admin';  // Админ
     public const MODER  = 'moder';  // Модератор
@@ -79,24 +132,21 @@ class User extends BaseModel
     public $uploadAvatarPath = UPLOADS . '/avatars';
 
     /**
-     * Записывать файлы в таблицу
-     *
-     * @var bool
-     */
-    public $dataRecord = false;
-
-    /**
      * Связь с таблицей online
+     *
+     * @return BelongsTo
      */
-    public function online()
+    public function online(): BelongsTo
     {
         return $this->belongsTo(Online::class, 'id', 'user_id')->withDefault();
     }
 
     /**
      * Возвращает последний бан
+     *
+     * @return hasOne
      */
-    public function lastBan()
+    public function lastBan(): hasOne
     {
         return $this->hasOne(Banhist::class, 'user_id', 'id')
             ->whereIn('type', ['ban', 'change'])
@@ -106,33 +156,49 @@ class User extends BaseModel
 
     /**
      * Возвращает заметку пользователя
+     *
+     * @return hasOne
      */
-    public function note()
+    public function note(): HasOne
     {
         return $this->hasOne(Note::class)->withDefault();
     }
 
     /**
-     * Возвращает ссылку на профиль пользователя
+     * Возвращает имя или логин пользователя
      *
-     * @param  string  $color цвет логина
-     * @param  boolean $link  выводить как ссылку
-     * @return string        путь к профилю
+     * @return string
      */
-    public function getProfile($color = null, $link = true): string
+    public function getName(): string
     {
         if ($this->id) {
-            $name = empty($this->name) ? $this->login : $this->name;
+            return empty($this->name) ? $this->login : $this->name;
+        }
+
+        return setting('guestsuser');
+    }
+
+    /**
+     * Возвращает ссылку на профиль пользователя
+     *
+     * @param  string $color цвет логина
+     * @return string        путь к профилю
+     */
+    public function getProfile($color = null): string
+    {
+        if ($this->id) {
+            $admin = null;
+            $name  = $this->getName();
 
             if ($color) {
                 $name = '<span style="color:' . $color . '">' . $name . '</span>';
             }
 
-            if ($link) {
-                return '<a class="author" href="/users/' . $this->login . '" data-login="' . $this->login . '">' . $name . '</a>';
+            if (\in_array($this->level, self::ADMIN_GROUPS, true)) {
+                $admin = ' <i class="fas fa-sm fa-crown text-danger"></i>';
             }
 
-            return '<span class="author" data-login="' . $this->login . '">' . $name . '</span>';
+            return '<a class="author" href="/users/' . $this->login . '" data-login="' . $this->login . '">' . $name . '</a>' . $admin;
         }
 
         return '<span class="author" data-login="' . setting('guestsuser') . '">' . setting('guestsuser') . '</span>';
@@ -205,7 +271,7 @@ class User extends BaseModel
                 }
 
                 $user->update([
-                    'visits'     => DB::raw('visits + 1'),
+                    'visits'     => DB::connection()->raw('visits + 1'),
                     'updated_at' => SITETIME
                 ]);
 
@@ -223,7 +289,7 @@ class User extends BaseModel
      * @return void
      * @throws \ErrorException
      */
-    public static function socialAuth($token)
+    public static function socialAuth($token): void
     {
         $domain = siteDomain(siteUrl());
 
@@ -457,7 +523,6 @@ class User extends BaseModel
      */
     public function isIgnore(User $user): bool
     {
-
         $isIgnore = Ignore::query()
             ->where('user_id', $this->id)
             ->where('ignore_id', $user->id)
@@ -479,9 +544,9 @@ class User extends BaseModel
      */
     public function sendMessage(?User $author, $text): bool
     {
-        Inbox::query()->create([
+        Message::query()->create([
             'user_id'    => $this->id,
-            'author_id'  => $author ? $author->id : null,
+            'author_id'  => $author ? $author->id : 0,
             'text'       => $text,
             'created_at' => SITETIME,
         ]);
@@ -498,7 +563,7 @@ class User extends BaseModel
      */
     public function getCountMessages(): int
     {
-        return Inbox::query()->where('user_id', $this->id)->count();
+        return Message::query()->where('user_id', $this->id)->count();
     }
 
     /**
@@ -551,16 +616,15 @@ class User extends BaseModel
     /**
      * Удаляет записи пользователя из всех таблиц
      *
-     * @return bool       результат удаления
+     * @return bool|null  результат удаления
      * @throws \Exception
      */
-    public function delete()
+    public function delete(): ?bool
     {
         deleteFile(HOME . $this->picture);
         deleteFile(HOME . $this->avatar);
 
-        Inbox::query()->where('user_id', $this->id)->delete();
-        Outbox::query()->where('user_id', $this->id)->delete();
+        Message::query()->where('user_id', $this->id)->delete();
         Contact::query()->where('user_id', $this->id)->delete();
         Ignore::query()->where('user_id', $this->id)->delete();
         Rating::query()->where('user_id', $this->id)->delete();

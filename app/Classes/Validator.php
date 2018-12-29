@@ -27,16 +27,16 @@ class Validator
      * @param  bool   $required
      * @return Validator
      */
-    public function length($input, $min, $max, $label, $required = true)
+    public function length($input, $min, $max, $label, $required = true): Validator
     {
         if (! $required && blank($input)) {
             return $this;
         }
 
         if (mb_strlen($input, 'utf-8') < $min) {
-            $this->addError($label, ' (Не менее '.$min.' симв.)');
+            $this->addError($label, ' (Не менее ' . $min . ' симв.)');
         } elseif (mb_strlen($input, 'utf-8') > $max) {
-            $this->addError($label, ' (Не более '.$max.' симв.)');
+            $this->addError($label, ' (Не более ' . $max . ' симв.)');
         }
 
         return $this;
@@ -51,10 +51,10 @@ class Validator
      * @param  mixed $label
      * @return Validator
      */
-    public function between($input, $min, $max, $label)
+    public function between($input, $min, $max, $label): Validator
     {
         if ($input < $min || $input > $max) {
-            $this->addError($label, ' (От '.$min.' до '.$max.')');
+            $this->addError($label, ' (От ' . $min . ' до ' . $max . ')');
         }
 
         return $this;
@@ -68,7 +68,7 @@ class Validator
      * @param  mixed $label
      * @return Validator
      */
-    public function gt($input, $input2, $label)
+    public function gt($input, $input2, $label): Validator
     {
         if ($input <= $input2) {
             $this->addError($label);
@@ -85,7 +85,7 @@ class Validator
      * @param  mixed $label
      * @return Validator
      */
-    public function gte($input, $input2, $label)
+    public function gte($input, $input2, $label): Validator
     {
         if ($input < $input2) {
             $this->addError($label);
@@ -102,7 +102,7 @@ class Validator
      * @param  mixed $label
      * @return Validator
      */
-    public function lt($input, $input2, $label)
+    public function lt($input, $input2, $label): Validator
     {
         if ($input >= $input2) {
             $this->addError($label);
@@ -119,7 +119,7 @@ class Validator
      * @param  mixed $label
      * @return Validator
      */
-    public function lte($input, $input2, $label)
+    public function lte($input, $input2, $label): Validator
     {
         if ($input > $input2) {
             $this->addError($label);
@@ -136,7 +136,7 @@ class Validator
      * @param  mixed $label
      * @return Validator
      */
-    public function equal($input, $input2, $label)
+    public function equal($input, $input2, $label): Validator
     {
         if ($input !== $input2) {
             $this->addError($label);
@@ -153,7 +153,7 @@ class Validator
      * @param  mixed $label
      * @return Validator
      */
-    public function notEqual($input, $input2, $label)
+    public function notEqual($input, $input2, $label): Validator
     {
         if ($input === $input2) {
             $this->addError($label);
@@ -169,7 +169,7 @@ class Validator
      * @param  mixed $label
      * @return Validator
      */
-    public function empty($input, $label)
+    public function empty($input, $label): Validator
     {
         if (! empty($input)) {
             $this->addError($label);
@@ -185,7 +185,7 @@ class Validator
      * @param  mixed $label
      * @return Validator
      */
-    public function notEmpty($input, $label)
+    public function notEmpty($input, $label): Validator
     {
         if (empty($input)) {
             $this->addError($label);
@@ -201,7 +201,7 @@ class Validator
      * @param  mixed $label
      * @return Validator
      */
-    public function true($input, $label)
+    public function true($input, $label): Validator
     {
         if (filter_var($input, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) === false) {
             $this->addError($label);
@@ -217,7 +217,7 @@ class Validator
      * @param  mixed $label
      * @return Validator
      */
-    public function false($input, $label)
+    public function false($input, $label): Validator
     {
         if (filter_var($input, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) !== false) {
             $this->addError($label);
@@ -234,9 +234,9 @@ class Validator
      * @param  mixed $label
      * @return Validator
      */
-    public function in($input, $haystack, $label)
+    public function in($input, $haystack, $label): Validator
     {
-        if (! is_array($haystack) || ! in_array($input, $haystack, true)) {
+        if (! \is_array($haystack) || ! \in_array($input, $haystack, true)) {
             $this->addError($label);
         }
 
@@ -251,9 +251,9 @@ class Validator
      * @param  mixed $label
      * @return Validator
      */
-    public function notIn($input, $haystack, $label)
+    public function notIn($input, $haystack, $label): Validator
     {
-        if (! is_array($haystack) || in_array($input, $haystack, true)) {
+        if (! \is_array($haystack) || \in_array($input, $haystack, true)) {
             $this->addError($label);
         }
 
@@ -269,7 +269,7 @@ class Validator
      * @param  bool   $required
      * @return Validator
      */
-    public function regex($input, $pattern, $label, $required = true)
+    public function regex($input, $pattern, $label, $required = true): Validator
     {
         if (! $required && blank($input)) {
             return $this;
@@ -290,13 +290,13 @@ class Validator
      * @param  bool  $required
      * @return Validator
      */
-    public function float($input, $label, $required = true)
+    public function float($input, $label, $required = true): Validator
     {
         if (! $required && blank($input)) {
             return $this;
         }
 
-        if (! is_float($input)) {
+        if (! \is_float($input)) {
             $this->addError($label);
         }
 
@@ -311,7 +311,7 @@ class Validator
      * @param  bool   $required
      * @return Validator
      */
-    public function url($input, $label, $required = true)
+    public function url($input, $label, $required = true): Validator
     {
         if (! $required && blank($input)) {
             return $this;
@@ -332,7 +332,7 @@ class Validator
      * @param  bool   $required
      * @return Validator
      */
-    public function email($input, $label, $required = true)
+    public function email($input, $label, $required = true): Validator
     {
         if (! $required && blank($input)) {
             return $this;
@@ -354,7 +354,7 @@ class Validator
      * @param bool                               $required
      * @return Validator
      */
-    public function file($input, $rules, $label, $required = true)
+    public function file($input, $rules, $label, $required = true): Validator
     {
         if (! $required && blank($input)) {
             return $this;
@@ -365,7 +365,7 @@ class Validator
             return $this;
         }
 
-        $key = is_array($label) ? key($label) : 0;
+        $key = \is_array($label) ? key($label) : 0;
 
         if (empty($rules['extensions'])) {
             $rules['extensions'] = ['jpg', 'jpeg', 'gif', 'png'];
@@ -373,18 +373,16 @@ class Validator
 
         $extension = strtolower($input->getClientOriginalExtension());
 
-        if (! in_array($extension, $rules['extensions'], true)) {
+        if (! \in_array($extension, $rules['extensions'], true)) {
             $this->addError([$key => 'Недопустимое расширение файла!']);
         }
 
-        if (isset($rules['maxsize'])) {
-            if ($input->getSize() > $rules['maxsize']) {
-                $this->addError([$key => 'Максимальный вес файла ' . formatSize($rules['maxsize']) . '!']);
-            }
+        if (isset($rules['maxsize']) && $input->getSize() > $rules['maxsize']) {
+            $this->addError([$key => 'Максимальный вес файла ' . formatSize($rules['maxsize']) . '!']);
         }
 
-        if (in_array($extension, ['jpg', 'jpeg', 'gif', 'png'], true)) {
-            list($width, $height) = getimagesize($input);
+        if (\in_array($extension, ['jpg', 'jpeg', 'gif', 'png'], true)) {
+            [$width, $height] = getimagesize($input);
 
             if (isset($rules['maxweight'])) {
                 if ($width > $rules['maxweight'] || $height > $rules['maxweight']) {
@@ -396,10 +394,8 @@ class Validator
                 if ($width < $rules['minweight'] || $height < $rules['minweight']) {
                     $this->addError([$key => 'Минимальный размер картинки ' . $rules['minweight'] . 'px!']);
                 }
-            } else {
-                if (empty($width) || empty($height)) {
-                    $this->addError([$key => 'Размер картинки слишком маленький!']);
-                }
+            } elseif (empty($width) || empty($height)) {
+                $this->addError([$key => 'Размер картинки слишком маленький!']);
             }
         }
 
@@ -413,11 +409,11 @@ class Validator
      * @param  string $description
      * @return void
      */
-    public function addError($error, $description = null)
+    public function addError($error, $description = null): void
     {
         $key = 0;
 
-        if (is_array($error)) {
+        if (\is_array($error)) {
             $key   = key($error);
             $error = current($error);
         }
@@ -434,7 +430,7 @@ class Validator
      *
      * @return array
      */
-    public function getErrors()
+    public function getErrors(): array
     {
         return $this->errors;
     }
@@ -444,7 +440,7 @@ class Validator
      *
      * @return void
      */
-    public function clearErrors()
+    public function clearErrors(): void
     {
         $this->errors = [];
     }
@@ -454,7 +450,7 @@ class Validator
      *
      * @return bool
      */
-    public function isValid()
+    public function isValid(): bool
     {
         return empty($this->errors);
     }

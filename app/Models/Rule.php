@@ -2,6 +2,13 @@
 
 namespace App\Models;
 
+/**
+ * Class Rule
+ *
+ * @property int id
+ * @property string text
+ * @property int created_at
+ */
 class Rule extends BaseModel
 {
     /**

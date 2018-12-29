@@ -2,18 +2,13 @@
 
 namespace App\Controllers\Admin;
 
-use App\Classes\Request;
 use App\Classes\Validator;
 use App\Models\BlackList;
 use App\Models\User;
+use Illuminate\Http\Request;
 
 class BlacklistController extends AdminController
 {
-    /**
-     * @var array
-     */
-    private $types;
-
     /**
      * @var string
      */
@@ -30,38 +25,43 @@ class BlacklistController extends AdminController
             abort(403, 'Доступ запрещен!');
         }
 
-        $this->types = ['email', 'login', 'domain'];
-        $this->type = Request::input('type', 'email');
+        $types = ['email', 'login', 'domain'];
 
-        if (! in_array($this->type, $this->types)) {
+        $request    = Request::createFromGlobals();
+        $this->type = $request->input('type', 'email');
+
+        if (! \in_array($this->type, $types, true)) {
             abort(404, 'Указанный тип не найден!');
         }
     }
 
     /**
      * Главная страница
+     *
+     * @param Request   $request
+     * @param Validator $validator
+     * @return string
      */
-    public function index()
+    public function index(Request $request, Validator $validator): string
     {
         $type = $this->type;
 
-        if (Request::isMethod('post')) {
-            $token = check(Request::input('token'));
-            $value = check(utfLower(Request::input('value')));
+        if ($request->isMethod('post')) {
+            $token = check($request->input('token'));
+            $value = check(utfLower($request->input('value')));
 
-            $validator = new Validator();
             $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
                 ->length($value, 1, 100, ['value' => 'Вы не ввели запись или она слишком длинная!']);
 
-            if ($type == 'email') {
+            if ($type === 'email') {
                 $validator->regex($value, '#^([a-z0-9_\-\.])+\@([a-z0-9_\-\.])+(\.([a-z0-9])+)+$#', ['value' => 'Недопустимый адрес email, необходим формат name@site.domen!']);
             }
 
-            if ($type == 'login') {
+            if ($type === 'login') {
                 $validator->regex($value, '|^[a-z0-9\-]+$|', ['value' => 'Недопустимые символы в логине!']);
             }
 
-            if ($type == 'domain') {
+            if ($type === 'domain') {
                 $value = siteDomain($value);
                 $validator->regex($value, '#([а-яa-z0-9_\-\.])+(\.([а-яa-z0-9\/])+)+$#u', ['value' => 'Недопустимый адрес сайта!']);
             }
@@ -81,7 +81,7 @@ class BlacklistController extends AdminController
                 setFlash('success', 'Запись успешно добавлена в черный список!');
                 redirect('/admin/blacklists?type=' . $type);
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }
@@ -102,15 +102,18 @@ class BlacklistController extends AdminController
 
     /**
      * Удаление записей
+     *
+     * @param Request   $request
+     * @param Validator $validator
+     * @return void
      */
-    public function delete()
+    public function delete(Request $request, Validator $validator): void
     {
-        $page  = int(Request::input('page', 1));
-        $token = check(Request::input('token'));
-        $del   = intar(Request::input('del'));
+        $page  = int($request->input('page', 1));
+        $token = check($request->input('token'));
+        $del   = intar($request->input('del'));
         $type  = $this->type;
 
-        $validator = new Validator();
         $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
             ->true($del, 'Отсутствуют выбранные записи для удаления!');
 

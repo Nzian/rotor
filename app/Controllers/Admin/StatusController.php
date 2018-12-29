@@ -2,10 +2,10 @@
 
 namespace App\Controllers\Admin;
 
-use App\Classes\Request;
 use App\Classes\Validator;
 use App\Models\Status;
 use App\Models\User;
+use Illuminate\Http\Request;
 
 class StatusController extends AdminController
 {
@@ -23,8 +23,10 @@ class StatusController extends AdminController
 
     /**
      * Главная страница
+     *
+     * @return string
      */
-    public function index()
+    public function index(): string
     {
         $statuses = Status::query()->orderBy('topoint', 'desc')->get();
 
@@ -33,17 +35,20 @@ class StatusController extends AdminController
 
     /**
      * Добавление статуса
+     *
+     * @param Request   $request
+     * @param Validator $validator
+     * @return string
      */
-    public function create()
+    public function create(Request $request, Validator $validator): string
     {
-        if (Request::isMethod('post')) {
-            $token   = check(Request::input('token'));
-            $topoint = int(Request::input('topoint'));
-            $point   = int(Request::input('point'));
-            $name    = check(Request::input('name'));
-            $color   = check(Request::input('color'));
+        if ($request->isMethod('post')) {
+            $token   = check($request->input('token'));
+            $topoint = int($request->input('topoint'));
+            $point   = int($request->input('point'));
+            $name    = check($request->input('name'));
+            $color   = check($request->input('color'));
 
-            $validator = new Validator();
             $validator
                 ->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
                 ->length($name, 5, 30, ['name' => 'Слишком длинное или короткое название статуса!'])
@@ -61,7 +66,7 @@ class StatusController extends AdminController
                 setFlash('success', 'Статус успешно добавлен!');
                 redirect('/admin/status');
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }
@@ -71,10 +76,14 @@ class StatusController extends AdminController
 
     /**
      * Редактирование статуса
+     *
+     * @param Request   $request
+     * @param Validator $validator
+     * @return string
      */
-    public function edit()
+    public function edit(Request $request, Validator $validator): string
     {
-        $id = int(Request::input('id'));
+        $id = int($request->input('id'));
 
         $status = Status::query()->find($id);
 
@@ -82,14 +91,13 @@ class StatusController extends AdminController
             abort(404, 'Выбранный вами статус не найден!');
         }
 
-        if (Request::isMethod('post')) {
-            $token   = check(Request::input('token'));
-            $topoint = int(Request::input('topoint'));
-            $point   = int(Request::input('point'));
-            $name    = check(Request::input('name'));
-            $color   = check(Request::input('color'));
+        if ($request->isMethod('post')) {
+            $token   = check($request->input('token'));
+            $topoint = int($request->input('topoint'));
+            $point   = int($request->input('point'));
+            $name    = check($request->input('name'));
+            $color   = check($request->input('color'));
 
-            $validator = new Validator();
             $validator
                 ->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
                 ->length($name, 5, 30, ['name' => 'Слишком длинное или короткое название статуса!'])
@@ -107,7 +115,7 @@ class StatusController extends AdminController
                 setFlash('success', 'Статус успешно изменен!');
                 redirect('/admin/status');
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }
@@ -117,13 +125,17 @@ class StatusController extends AdminController
 
     /**
      * Удаление статуса
+     *
+     * @param Request   $request
+     * @param Validator $validator
+     * @return void
+     * @throws \Exception
      */
-    public function delete()
+    public function delete(Request $request, Validator $validator): void
     {
-        $token = check(Request::input('token'));
-        $id    = int(Request::input('id'));
+        $token = check($request->input('token'));
+        $id    = int($request->input('id'));
 
-        $validator = new Validator();
         $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!');
 
         $status = Status::query()->find($id);

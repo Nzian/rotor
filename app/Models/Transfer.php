@@ -2,6 +2,18 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+/**
+ * Class Transfer
+ *
+ * @property int id
+ * @property int user_id
+ * @property int recipient_id
+ * @property string text
+ * @property int total
+ * @property int created_at
+ */
 class Transfer extends BaseModel
 {
     /**
@@ -20,8 +32,10 @@ class Transfer extends BaseModel
 
     /**
      * Возвращает связь пользователей
+     *
+     * @return BelongsTo
      */
-    public function recipientUser()
+    public function recipientUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'recipient_id')->withDefault();
     }

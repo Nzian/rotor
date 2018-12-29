@@ -2,10 +2,10 @@
 
 namespace App\Controllers\Admin;
 
-use App\Classes\Request;
 use App\Classes\Validator;
 use App\Models\Photo;
 use App\Models\User;
+use Illuminate\Http\Request;
 
 class PhotoController extends AdminController
 {
@@ -23,13 +23,16 @@ class PhotoController extends AdminController
 
     /**
      * Главная страница
+     *
+     * @return string
      */
-    public function index()
+    public function index(): string
     {
-        $total = Photo::count();
+        $total = Photo::query()->count();
         $page  = paginate(setting('fotolist'), $total);
 
-        $photos = Photo::orderBy('created_at', 'desc')
+        $photos = Photo::query()
+            ->orderBy('created_at', 'desc')
             ->offset($page->offset)
             ->limit($page->limit)
             ->with('user')
@@ -40,23 +43,27 @@ class PhotoController extends AdminController
 
     /**
      * Редактирование ссылки
+     *
+     * @param int       $id
+     * @param Request   $request
+     * @param Validator $validator
+     * @return string
      */
-    public function edit($id)
+    public function edit(int $id, Request $request, Validator $validator): string
     {
-        $page  = int(Request::input('page', 1));
+        $page  = int($request->input('page', 1));
         $photo = Photo::query()->find($id);
 
         if (! $photo) {
             abort(404, 'Данной фотографии не существует!');
         }
 
-        if (Request::isMethod('post')) {
-            $token  = check(Request::input('token'));
-            $title  = check(Request::input('title'));
-            $text   = check(Request::input('text'));
-            $closed = empty(Request::input('closed')) ? 0 : 1;
+        if ($request->isMethod('post')) {
+            $token  = check($request->input('token'));
+            $title  = check($request->input('title'));
+            $text   = check($request->input('text'));
+            $closed = empty($request->input('closed')) ? 0 : 1;
 
-            $validator = new Validator();
             $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
                 ->length($title, 5, 50, ['title' => 'Слишком длинное или короткое название!'])
                 ->length($text, 0, 1000, ['text' => 'Слишком длинное описание (Необходимо не более 1000 символов)!']);
@@ -74,7 +81,7 @@ class PhotoController extends AdminController
                 setFlash('success', 'Фотография успешно отредактирована!');
                 redirect('/admin/photos?page=' . $page);
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }
@@ -84,23 +91,29 @@ class PhotoController extends AdminController
 
     /**
      * Удаление записей
+     *
+     * @param int       $id
+     * @param Request   $request
+     * @param Validator $validator
+     * @return void
+     * @throws \Exception
      */
-    public function delete($id): void
+    public function delete(int $id, Request $request, Validator $validator): void
     {
         if (! is_writable(UPLOADS . '/photos')){
             abort('default', 'Директория c фотографиями недоступна для записи!');
         }
 
-        $page  = int(Request::input('page', 1));
-        $token = check(Request::input('token'));
+        $page  = int($request->input('page', 1));
+        $token = check($request->input('token'));
 
+        /** @var Photo $photo */
         $photo = Photo::query()->find($id);
 
         if (! $photo) {
             abort(404, 'Данной фотографии не существует!');
         }
 
-        $validator = new Validator();
         $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!');
 
         if ($validator->isValid()) {
@@ -118,10 +131,13 @@ class PhotoController extends AdminController
 
     /**
      * Пересчет комментариев
+     *
+     * @param Request $request
+     * @return void
      */
-    public function restatement(): void
+    public function restatement(Request $request): void
     {
-        $token = check(Request::input('token'));
+        $token = check($request->input('token'));
 
         if (isAdmin(User::BOSS)) {
             if ($token === $_SESSION['token']) {

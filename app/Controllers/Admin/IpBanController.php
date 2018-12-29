@@ -2,10 +2,10 @@
 
 namespace App\Controllers\Admin;
 
-use App\Classes\Request;
 use App\Classes\Validator;
 use App\Models\Ban;
 use App\Models\User;
+use Illuminate\Http\Request;
 
 class IpBanController extends AdminController
 {
@@ -23,14 +23,17 @@ class IpBanController extends AdminController
 
     /**
      * Главная страница
+     *
+     * @param Request   $request
+     * @param Validator $validator
+     * @return string
      */
-    public function index()
+    public function index(Request $request, Validator $validator): string
     {
-        if (Request::isMethod('post')) {
-            $token = check(Request::input('token'));
-            $ip    = check(Request::input('ip'));
+        if ($request->isMethod('post')) {
+            $token = check($request->input('token'));
+            $ip    = check($request->input('ip'));
 
-            $validator = new Validator();
             $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
                 ->regex($ip, '|^[0-9]{1,3}\.[0-9,*]{1,3}\.[0-9,*]{1,3}\.[0-9,*]{1,3}$|', ['ip' => 'Вы ввели недопустимый IP-адрес для бана!']);
 
@@ -50,7 +53,7 @@ class IpBanController extends AdminController
                 setFlash('success', 'IP успешно занесен в список!');
                 redirect('/admin/ipbans');
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }
@@ -70,14 +73,17 @@ class IpBanController extends AdminController
 
     /**
      * Удаление ip
+     *
+     * @param Request   $request
+     * @param Validator $validator
+     * @return void
      */
-    public function delete()
+    public function delete(Request $request, Validator $validator): void
     {
-        $page  = int(Request::input('page', 1));
-        $token = check(Request::input('token'));
-        $del   = intar(Request::input('del'));
+        $page  = int($request->input('page', 1));
+        $token = check($request->input('token'));
+        $del   = intar($request->input('del'));
 
-        $validator = new Validator();
         $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
             ->true($del, 'Отсутствуют выбранные ip для удаления!');
 
@@ -96,12 +102,15 @@ class IpBanController extends AdminController
 
     /**
      * Очистка ip
+     *
+     * @param Request   $request
+     * @param Validator $validator
+     * @return void
      */
-    public function clear()
+    public function clear(Request $request, Validator $validator): void
     {
-        $token = check(Request::input('token'));
+        $token = check($request->input('token'));
 
-        $validator = new Validator();
         $validator
             ->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
             ->true(isAdmin(User::BOSS), 'Очищать список IP может только владелец!');

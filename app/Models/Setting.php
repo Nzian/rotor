@@ -2,6 +2,12 @@
 
 namespace App\Models;
 
+/**
+ * Class Setting
+ *
+ * @property string name
+ * @property string value
+ */
 class Setting extends BaseModel
 {
     /**
@@ -23,7 +29,7 @@ class Setting extends BaseModel
      *
      * @return array
      */
-    public static function getActions()
+    public static function getActions(): array
     {
         return [
             'main',
@@ -40,7 +46,7 @@ class Setting extends BaseModel
             'price',
             'advert',
             'image',
-            'smile',
+            'sticker',
             'offer',
         ];
     }

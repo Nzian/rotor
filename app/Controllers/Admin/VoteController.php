@@ -2,11 +2,12 @@
 
 namespace App\Controllers\Admin;
 
-use App\Classes\Request;
 use App\Classes\Validator;
 use App\Models\User;
 use App\Models\Vote;
+use App\Models\VoteAnswer;
 use Illuminate\Database\Capsule\Manager as DB;
+use Illuminate\Http\Request;
 
 class VoteController extends AdminController
 {
@@ -21,8 +22,10 @@ class VoteController extends AdminController
 
     /**
      * Главная страница
+     *
+     * @return string
      */
-    public function index()
+    public function index(): string
     {
         $total = Vote::query()->where('closed', 0)->count();
         $page = paginate(setting('allvotes'), $total);
@@ -40,8 +43,10 @@ class VoteController extends AdminController
 
     /**
      * Архив голосований
+     *
+     * @return string
      */
-    public function history()
+    public function history(): string
     {
         $total = Vote::query()->where('closed', 0)->count();
         $page = paginate(setting('allvotes'), $total);
@@ -59,8 +64,13 @@ class VoteController extends AdminController
 
     /**
      * Редактирование голосования
+     *
+     * @param int       $id
+     * @param Request   $request
+     * @param Validator $validator
+     * @return string
      */
-    public function edit($id)
+    public function edit(int $id, Request $request, Validator $validator): string
     {
         $vote = Vote::query()->where('id', $id)->first();
 
@@ -68,13 +78,11 @@ class VoteController extends AdminController
             abort(404, 'Данного голосования не существует!');
         }
 
-        if (Request::isMethod('post')) {
+        if ($request->isMethod('post')) {
+            $token   = check($request->input('token'));
+            $title   = check($request->input('title'));
+            $answers = check((array) $request->input('answers'));
 
-            $token   = check(Request::input('token'));
-            $title   = check(Request::input('title'));
-            $answers = check(Request::input('answers'));
-
-            $validator = new Validator();
             $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!');
 
             $validator->length($title, 5, 100, ['title' => 'Слишком длинный или короткий текст вопроса!']);
@@ -87,7 +95,7 @@ class VoteController extends AdminController
                 }
             }
 
-            $validator->between(count($answers), 2, 10, ['answer' => 'Недостаточное количество вариантов ответов!']);
+            $validator->between(\count($answers), 2, 10, ['answer' => 'Недостаточное количество вариантов ответов!']);
 
             if ($validator->isValid()) {
 
@@ -95,32 +103,44 @@ class VoteController extends AdminController
                     'title' => $title,
                 ]);
 
+                $countAnswers = $vote->answers()->count();
+
                 foreach ($answers as $answerId => $answer) {
-                    $vote->answers()
-                        ->updateOrCreate(['id' => $answerId], [
-                            'answer' => $answer
-                        ]);
+                    /** @var VoteAnswer $ans */
+                    $ans = $vote->answers()->firstOrNew(['id' => $answerId]);
+
+                    if ($ans->exists) {
+                        $ans->update(['answer' => $answer]);
+                    } else if ($countAnswers < 10) {
+                        $ans->fill(['answer' => $answer])->save();
+                        $countAnswers++;
+                    }
                 }
 
                 setFlash('success', 'Голосование успешно изменено!');
                 redirect('/admin/votes/edit/'.$vote->id);
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }
 
-        $getAnswers = $vote->answers->pluck('answer', 'id')->all();
+        $vote->getAnswers = $vote->answers->pluck('answer', 'id')->all();
 
-        return view('admin/votes/edit', compact('vote', 'getAnswers'));
+        return view('admin/votes/edit', compact('vote'));
     }
 
     /**
      * Удаление голосования
+     *
+     * @param int     $id
+     * @param Request $request
+     * @return void
+     * @throws \Throwable
      */
-    public function delete($id)
+    public function delete(int $id, Request $request): void
     {
-        $token = check(Request::input('token'));
+        $token = check($request->input('token'));
         $vote  = Vote::query()->where('id', $id)->first();
 
         if (! $vote) {
@@ -133,7 +153,7 @@ class VoteController extends AdminController
 
         if ($token === $_SESSION['token']) {
 
-            DB::transaction(function () use ($vote) {
+            DB::connection()->transaction(function () use ($vote) {
                 $vote->delete();
                 $vote->answers()->delete();
                 $vote->pollings()->delete();
@@ -149,10 +169,14 @@ class VoteController extends AdminController
 
     /**
      * Открытие-закрытие голосования
+     *
+     * @param int     $id
+     * @param Request $request
+     * @return void
      */
-    public function close($id)
+    public function close(int $id, Request $request): void
     {
-        $token = check(Request::input('token'));
+        $token = check($request->input('token'));
         $vote  = Vote::query()->where('id', $id)->first();
 
         if (! $vote) {
@@ -178,27 +202,30 @@ class VoteController extends AdminController
             setFlash('danger', 'Ошибка! Неверный идентификатор сессии, повторите действие!');
         }
 
-        if ($closed) {
-            redirect('/admin/votes/history');
-        }  else {
+        if (empty($closed)) {
             redirect('/admin/votes');
+        }  else {
+            redirect('/admin/votes/history');
         }
     }
 
     /**
      * Пересчет голосов
+     *
+     * @param Request $request
+     * @return void
      */
-    public function restatement()
+    public function restatement(Request $request): void
     {
         if (! isAdmin(User::BOSS)) {
             abort(403, 'Доступ запрещен!');
         }
 
-        $token = check(Request::input('token'));
+        $token = check($request->input('token'));
 
         if ($token === $_SESSION['token']) {
 
-            DB::update('update vote set count = (select SUM(result) from voteanswer where vote.id = voteanswer.vote_id)');
+            restatement('votes');
 
             setFlash('success', 'Голосования успешно пересчитаны!');
         } else {

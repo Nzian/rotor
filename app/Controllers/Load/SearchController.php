@@ -2,23 +2,26 @@
 
 namespace App\Controllers\Load;
 
-use App\Classes\Request;
 use App\Controllers\BaseController;
 use App\Models\Down;
 use App\Models\Load;
+use Illuminate\Http\Request;
 
 class SearchController extends BaseController
 {
     /**
      * Поиск
+     *
+     * @param Request $request
+     * @return string
      */
-    public function index()
+    public function index(Request $request): ?string
     {
-        $cid     = check(Request::input('cid'));
-        $find    = check(Request::input('find'));
-        $type    = int(Request::input('type'));
-        $where   = int(Request::input('where'));
-        $section = int(Request::input('section'));
+        $cid     = int($request->input('cid'));
+        $find    = check($request->input('find'));
+        $type    = int($request->input('type'));
+        $where   = int($request->input('where'));
+        $section = int($request->input('section'));
 
         if (! $find) {
             $categories = Load::query()
@@ -40,31 +43,32 @@ class SearchController extends BaseController
             $find = winToUtf($find);
         }
 
-        if (utfStrlen($find) >= 3 && utfStrlen($find) <= 50) {
+        $strlen = utfStrlen($find);
+        if ($strlen >= 3 && $strlen <= 50) {
 
             $findmewords = explode(' ', utfLower($find));
 
             $arrfind = [];
             foreach ($findmewords as $val) {
                 if (utfStrlen($val) >= 3) {
-                    $arrfind[] = (empty($type)) ? '+' . $val . '*' : $val . '*';
+                    $arrfind[] = empty($type) ? '+' . $val . '*' : $val . '*';
                 }
             }
 
             $findme = implode(' ', $arrfind);
 
-            if ($type == 2 && count($findmewords) > 1) {
+            if ($type === 2 && \count($findmewords) > 1) {
                 $findme = "\"$find\"";
             }
 
-            $wheres = (empty($where)) ? 'title' : 'text';
+            $wheres = empty($where) ? 'title' : 'text';
 
             $loadfind = ($type . $wheres . $section . $find);
 
             // Поиск в названии
             if ($wheres === 'title') {
 
-                if (empty($_SESSION['loadfindres']) || $loadfind != $_SESSION['loadfind']) {
+                if (empty($_SESSION['loadfindres']) || $loadfind !== $_SESSION['loadfind']) {
 
                     $searchsec = ($section > 0) ? 'category_id = ' . $section . ' AND' : '';
 
@@ -80,7 +84,7 @@ class SearchController extends BaseController
                     $_SESSION['loadfindres'] = $result;
                 }
 
-                $total = count($_SESSION['loadfindres']);
+                $total = \count($_SESSION['loadfindres']);
 
                 if ($total > 0) {
                     $page = paginate(setting('downlist'), $total);
@@ -96,7 +100,7 @@ class SearchController extends BaseController
                     return view('loads/search_title', compact('downs', 'page', 'find', 'type', 'where', 'section'));
                 }
 
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', 'По вашему запросу ничего не найдено!');
                 redirect('/loads/search');
             }
@@ -104,7 +108,7 @@ class SearchController extends BaseController
             // Поиск в описании
             if ($wheres === 'text') {
 
-                if (empty($_SESSION['loadfindres']) || $loadfind != $_SESSION['loadfind']) {
+                if (empty($_SESSION['loadfindres']) || $loadfind !== $_SESSION['loadfind']) {
 
                     $searchsec = ($section > 0) ? 'category_id = ' . $section . ' AND' : '';
 
@@ -120,7 +124,7 @@ class SearchController extends BaseController
                     $_SESSION['loadfindres'] = $result;
                 }
 
-                $total = count($_SESSION['loadfindres']);
+                $total = \count($_SESSION['loadfindres']);
 
                 if ($total > 0) {
                     $page = paginate(setting('downlist'), $total);
@@ -136,13 +140,13 @@ class SearchController extends BaseController
                     return view('loads/search_text', compact('downs', 'page', 'find', 'type', 'where', 'section'));
                 }
 
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', 'По вашему запросу ничего не найдено!');
                 redirect('/loads/search');
             }
 
         } else {
-            setInput(Request::all());
+            setInput($request->all());
             setFlash('danger', ['find' => 'Запрос должен содержать от 3 до 50 символов!']);
             redirect('/loads/search');
         }

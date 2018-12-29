@@ -7,9 +7,6 @@
 @section('description', stripString($down->text))
 
 @section('content')
-
-    <h1>{{ $down->title }}</h1>
-
     <nav>
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="/"><i class="fas fa-home"></i></a></li>
@@ -29,9 +26,11 @@
         </ol>
     </nav>
 
+    <h1>{{ $down->title }}</h1>
+
     @if (! $down->active)
         <div class="p-1 bg-warning text-dark">
-            <b>Внимание!</b> Данная загрузка ожидает проверки модератором!<br>
+            <i class="fas fa-exclamation-triangle"></i> Внимание! Данная загрузка ожидает проверки модератором!<br>
             @if ($down->user_id === getUser('id'))
                 <i class="fa fa-pencil-alt"></i> <a href="/downs/edit/{{ $down->id }}">Перейти к редактированию</a>
             @endif
@@ -47,7 +46,9 @@
             <div class="mt-3">
                 @foreach ($down->getFiles() as $file)
                     @if ($file->hash && file_exists(HOME . $file->hash))
-                        <i class="fa fa-download"></i> <b><a href="/downs/download/{{ $file->id }}">{{ $file->name }}</a></b> ({{ formatSize($file->size) }})
+
+                        {{ $file->name }} ({{ formatSize($file->size) }})<br>
+                        <a class="btn btn-success" href="/downs/download/{{ $file->id }}"><i class="fa fa-download"></i> Скачать</a><br>
 
                         @if ($file->extension === 'mp3')
                             <audio preload="none" controls style="max-width:100%;">
@@ -64,7 +65,7 @@
                         @endif
 
                         @if ($file->extension === 'zip')
-                            <a href="/downs/zip/{{ $file->id }}">Просмотреть архив</a>
+                            <a href="/downs/zip/{{ $file->id }}">Просмотреть архив</a><br>
                         @endif
                     @else
                         <i class="fa fa-download"></i> Файл не найден
@@ -95,17 +96,17 @@
         Добавлено: {!! $down->user->getProfile() !!} ({{ dateFixed($down->created_at) }})<br><br>
     </div>
 
-    @if (getUser() && getUser('id') !== $down->user_id)
+    @if (getUser() && getUser('id') === $down->user_id)
         <form class="form-inline" action="/downs/votes/{{ $down->id }}" method="post">
             <input type="hidden" name="token" value="{{ $_SESSION['token'] }}">
 
             <div class="form-group mb-2{{ hasError('score') }}">
                 <select class="form-control" id="score" name="score">
-                    <option value="5" {{ $down->vote == 5 ? ' selected' : '' }}>Отлично</option>
-                    <option value="4" {{ $down->vote == 4 ? ' selected' : '' }}>Хорошо</option>
-                    <option value="3" {{ $down->vote == 3 ? ' selected' : '' }}>Нормально</option>
-                    <option value="2" {{ $down->vote == 2 ? ' selected' : '' }}>Плохо</option>
-                    <option value="1" {{ $down->vote == 1 ? ' selected' : '' }}>Отстой</option>
+                    <option value="5" {{ $down->vote === '5' ? ' selected' : '' }}>Отлично</option>
+                    <option value="4" {{ $down->vote === '4' ? ' selected' : '' }}>Хорошо</option>
+                    <option value="3" {{ $down->vote === '3' ? ' selected' : '' }}>Нормально</option>
+                    <option value="2" {{ $down->vote === '2' ? ' selected' : '' }}>Плохо</option>
+                    <option value="1" {{ $down->vote === '1' ? ' selected' : '' }}>Отстой</option>
                 </select>
                 {!! textError('protect') !!}
             </div>

@@ -2,7 +2,6 @@
 
 namespace App\Controllers\Forum;
 
-use App\Classes\Request;
 use App\Classes\Validator;
 use App\Controllers\BaseController;
 use App\Models\Flood;
@@ -12,13 +11,17 @@ use App\Models\Topic;
 use App\Models\Vote;
 use App\Models\VoteAnswer;
 use Illuminate\Database\Capsule\Manager as DB;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Request;
 
 class ForumController extends BaseController
 {
     /**
      * Главная страница
+     *
+     * @return string
      */
-    public function index()
+    public function index(): string
     {
         $forums = Forum::query()
             ->where('parent_id', 0)
@@ -36,9 +39,13 @@ class ForumController extends BaseController
 
     /**
      * Страница списка тем
+     *
+     * @param int $id
+     * @return string
      */
-    public function forum($id)
+    public function forum(int $id): string
     {
+        /** @var Forum $forum */
         $forum = Forum::query()->with('parent', 'children.lastTopic.lastPost.user')->find($id);
 
         if (! $forum) {
@@ -63,10 +70,14 @@ class ForumController extends BaseController
 
     /**
      * Создание новой темы
+     *
+     * @param Request   $request
+     * @param Validator $validator
+     * @return string
      */
-    public function create()
+    public function create(Request $request, Validator $validator): string
     {
-        $fid = int(Request::input('fid'));
+        $fid = int($request->input('fid'));
 
         $forums = Forum::query()
             ->where('parent_id', 0)
@@ -82,18 +93,18 @@ class ForumController extends BaseController
             abort(403);
         }
 
-        if (Request::isMethod('post')) {
+        if ($request->isMethod('post')) {
 
-            $title    = check(Request::input('title'));
-            $msg      = check(Request::input('msg'));
-            $token    = check(Request::input('token'));
-            $vote     = empty(Request::input('vote')) ? 0 : 1;
-            $question = check(Request::input('question'));
-            $answers  = check(Request::input('answer'));
+            $title    = check($request->input('title'));
+            $msg      = check($request->input('msg'));
+            $token    = check($request->input('token'));
+            $vote     = empty($request->input('vote')) ? 0 : 1;
+            $question = check($request->input('question'));
+            $answers  = check((array) $request->input('answers'));
 
+            /** @var Forum $forum */
             $forum = Forum::query()->find($fid);
 
-            $validator = new Validator();
             $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
                 ->notEmpty($forum, ['fid' => 'Форума для новой темы не существует!'])
                 ->equal(Flood::isFlood(), true, ['msg' => 'Антифлуд! Разрешается cоздавать темы раз в '.Flood::getPeriod().' сек!'])
@@ -110,12 +121,12 @@ class ForumController extends BaseController
 
                 foreach ($answers as $answer) {
                     if (utfStrlen($answer) > 50) {
-                        $validator->addError(['answer' => 'Длина вариантов ответа не должна быть более 50 символов!']);
+                        $validator->addError(['answers' => 'Длина вариантов ответа не должна быть более 50 символов!']);
                         break;
                     }
                 }
 
-                $validator->between(count($answers), 2, 10, ['answer' => 'Недостаточное количество вариантов ответов!']);
+                $validator->between(\count($answers), 2, 10, ['answers' => 'Недостаточное количество вариантов ответов!']);
             }
 
             /* TODO: Сделать проверку поиска похожей темы */
@@ -126,11 +137,12 @@ class ForumController extends BaseController
                 $msg   = antimat($msg);
 
                 $user->update([
-                    'allforum' => DB::raw('allforum + 1'),
-                    'point'    => DB::raw('point + 1'),
-                    'money'    => DB::raw('money + 5'),
+                    'allforum' => DB::connection()->raw('allforum + 1'),
+                    'point'    => DB::connection()->raw('point + 1'),
+                    'money'    => DB::connection()->raw('money + 5'),
                 ]);
 
+                /** @var Topic $topic */
                 $topic = Topic::query()->create([
                     'forum_id'    => $forum->id,
                     'title'       => $title,
@@ -140,6 +152,7 @@ class ForumController extends BaseController
                     'updated_at'  => SITETIME,
                 ]);
 
+                /** @var Post $post */
                 $post = Post::query()->create([
                     'topic_id'   => $topic->id,
                     'user_id'    => getUser('id'),
@@ -152,8 +165,8 @@ class ForumController extends BaseController
                 Topic::query()->where('id', $topic->id)->update(['last_post_id' => $post->id]);
 
                 $forum->update([
-                    'count_topics'  => DB::raw('count_topics + 1'),
-                    'count_posts'   => DB::raw('count_posts + 1'),
+                    'count_topics'  => DB::connection()->raw('count_topics + 1'),
+                    'count_posts'   => DB::connection()->raw('count_posts + 1'),
                     'last_topic_id' => $topic->id,
                 ]);
 
@@ -166,6 +179,7 @@ class ForumController extends BaseController
 
                 // Создание голосования
                 if ($vote) {
+                    /** @var Vote $vote */
                     $vote = Vote::query()->create([
                         'title'      => $question,
                         'topic_id'   => $topic->id,
@@ -186,7 +200,7 @@ class ForumController extends BaseController
                 setFlash('success', 'Новая тема успешно создана!');
                 redirect('/topics/'.$topic->id);
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }
@@ -196,15 +210,18 @@ class ForumController extends BaseController
 
     /**
      * Поиск
+     *
+     * @param Request $request
+     * @return string
      */
-    public function search()
+    public function search(Request $request): ?string
     {
-        $fid     = check(Request::input('fid'));
-        $find    = check(Request::input('find'));
-        $type    = int(Request::input('type'));
-        $where   = int(Request::input('where'));
-        $period  = int(Request::input('period'));
-        $section = int(Request::input('section'));
+        $fid     = int($request->input('fid'));
+        $find    = check($request->input('find'));
+        $type    = int($request->input('type'));
+        $where   = int($request->input('where'));
+        $period  = int($request->input('period'));
+        $section = int($request->input('section'));
 
         if (! $find) {
             $forums = Forum::query()
@@ -227,31 +244,32 @@ class ForumController extends BaseController
             $find = winToUtf($find);
         }
 
-        if (utfStrlen($find) >= 3 && utfStrlen($find) <= 50) {
+        $strlen = utfStrlen($find);
+        if ($strlen >= 3 && $strlen <= 50) {
 
             $findmewords = explode(' ', utfLower($find));
 
             $arrfind = [];
             foreach ($findmewords as $val) {
                 if (utfStrlen($val) >= 3) {
-                    $arrfind[] = (empty($type)) ? '+' . $val . '*' : $val . '*';
+                    $arrfind[] = empty($type) ? '+' . $val . '*' : $val . '*';
                 }
             }
 
-            $findme = implode(" ", $arrfind);
+            $findme = implode(' ', $arrfind);
 
-            if ($type == 2 && count($findmewords) > 1) {
+            if ($type === 2 && \count($findmewords) > 1) {
                 $findme = "\"$find\"";
             }
 
-            $wheres = (empty($where)) ? 'topics' : 'posts';
+            $wheres = empty($where) ? 'topics' : 'posts';
 
             $forumfind = ($type . $wheres . $period . $section . $find);
 
             // Поиск в темах
             if ($wheres === 'topics') {
 
-                if (empty($_SESSION['forumfindres']) || $forumfind != $_SESSION['forumfind']) {
+                if (empty($_SESSION['forumfindres']) || $forumfind !== $_SESSION['forumfind']) {
 
                     $searchsec = ($section > 0) ? 'forum_id = ' . $section . ' AND' : '';
                     $searchper = ($period > 0) ? 'updated_at > ' . strtotime('-' . $period . ' day', SITETIME) . ' AND' : '';
@@ -267,7 +285,7 @@ class ForumController extends BaseController
                     $_SESSION['forumfindres'] = $result;
                 }
 
-                $total = count($_SESSION['forumfindres']);
+                $total = \count($_SESSION['forumfindres']);
 
                 if ($total > 0) {
                     $page = paginate(setting('forumtem'), $total);
@@ -283,7 +301,7 @@ class ForumController extends BaseController
                     return view('forums/search_topics', compact('topics', 'page', 'find', 'type', 'where', 'section', 'period'));
                 }
 
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', 'По вашему запросу ничего не найдено!');
                 redirect('/forums/search');
             }
@@ -291,7 +309,7 @@ class ForumController extends BaseController
             // Поиск в сообщениях
             if ($wheres === 'posts') {
 
-                if (empty($_SESSION['forumfindres']) || $forumfind != $_SESSION['forumfind']) {
+                if (empty($_SESSION['forumfindres']) || $forumfind !== $_SESSION['forumfind']) {
 
                     $searchsec = ($section > 0) ? 'topics.forum_id = ' . $section . ' AND' : '';
                     $searchper = ($period > 0) ? 'posts.created_at > ' . strtotime('-' . $period . ' day', SITETIME) . ' AND' : '';
@@ -308,7 +326,7 @@ class ForumController extends BaseController
                     $_SESSION['forumfindres'] = $result;
                 }
 
-                $total = count($_SESSION['forumfindres']);
+                $total = \count($_SESSION['forumfindres']);
 
                 if ($total > 0) {
                     $page = paginate(setting('forumpost'), $total);
@@ -324,13 +342,13 @@ class ForumController extends BaseController
                     return view('forums/search_posts', compact('posts', 'page', 'find', 'type', 'where', 'section', 'period'));
                 }
 
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', 'По вашему запросу ничего не найдено!');
                 redirect('/forums/search');
             }
 
         } else {
-            setInput(Request::all());
+            setInput($request->all());
             setFlash('danger', ['find' => 'Запрос должен содержать от 3 до 50 символов!']);
             redirect('/forums/search');
         }
@@ -338,8 +356,10 @@ class ForumController extends BaseController
 
     /**
      * RSS всех топиков
+     *
+     * @return string
      */
-    public function rss()
+    public function rss(): string
     {
         $topics = Topic::query()
             ->where('closed', 0)
@@ -357,9 +377,13 @@ class ForumController extends BaseController
 
     /**
      * RSS постов
+     *
+     * @param int $id
+     * @return string
      */
-    public function rssPosts($id)
+    public function rssPosts(int $id): string
     {
+        /** @var Topic $topic */
         $topic = Topic::query()->find($id);
 
         if (empty($topic)) {
@@ -378,8 +402,10 @@ class ForumController extends BaseController
 
     /**
      * Последние темы
+     *
+     * @return string
      */
-    public function topTopics()
+    public function topTopics(): string
     {
         $total = Topic::query()->count();
 
@@ -402,13 +428,16 @@ class ForumController extends BaseController
 
     /**
      * Последние сообщения
+     *
+     * @param Request $request
+     * @return string
      */
-    public function topPosts()
+    public function topPosts(Request $request): string
     {
-        $period = int(Request::input('period'));
+        $period = int($request->input('period'));
 
         $total = Post::query()
-            ->when($period, function ($query) use ($period) {
+            ->when($period, function (Builder $query) use ($period) {
                 return $query->where('created_at', '>', strtotime('-' . $period . ' day', SITETIME));
             })
             ->count();
@@ -420,7 +449,7 @@ class ForumController extends BaseController
         $page = paginate(setting('forumpost'), $total);
 
         $posts = Post::query()
-            ->when($period, function ($query) use ($period) {
+            ->when($period, function (Builder $query) use ($period) {
                 return $query->where('created_at', '>', strtotime('-' . $period . ' day', SITETIME));
             })
             ->orderBy('rating', 'desc')

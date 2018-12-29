@@ -2,24 +2,27 @@
 
 namespace App\Controllers;
 
-use App\Classes\Request;
 use App\Classes\Validator;
 use App\Models\Comment;
 use App\Models\Flood;
 use App\Models\Offer;
-use App\Models\Polling;
 use Illuminate\Database\Query\JoinClause;
+use Illuminate\Http\Request;
 
 class OfferController extends BaseController
 {
     /**
      * Главная страница
+     *
+     * @param string  $type
+     * @param Request $request
+     * @return string
      */
-    public function index($type = 'offer')
+    public function index(Request $request, $type = 'offer'): string
     {
         $otherType = $type === Offer::OFFER ? Offer::ISSUE : Offer::OFFER;
 
-        $sort = check(Request::input('sort'));
+        $sort = check($request->input('sort'));
 
         $total = Offer::query()->where('type', $type)->count();
         $page = paginate(setting('postoffers'), $total);
@@ -53,8 +56,11 @@ class OfferController extends BaseController
 
     /**
      * Просмотр записи
+     *
+     * @param int $id
+     * @return string
      */
-    public function view($id)
+    public function view(int $id): string
     {
         $offer = Offer::query()
             ->select('offers.*', 'pollings.vote')
@@ -75,23 +81,25 @@ class OfferController extends BaseController
 
     /**
      * Создание записи
+     *
+     * @param Request   $request
+     * @param Validator $validator
+     * @return string
      */
-    public function create()
+    public function create(Request $request, Validator $validator): string
     {
         if (! $user = getUser()) {
             abort(403, 'Авторизуйтесь для добавления записи!');
         }
 
-        $type  = check(Request::input('type'));
+        $type  = check($request->input('type'));
 
-        if (Request::isMethod('post')) {
+        if ($request->isMethod('post')) {
 
-            $token = check(Request::input('token'));
-            $title = check(Request::input('title'));
-            $text  = check(Request::input('text'));
+            $token = check($request->input('token'));
+            $title = check($request->input('title'));
+            $text  = check($request->input('text'));
 
-
-            $validator = new Validator();
             $validator->equal($token, $_SESSION['token'], ['Неверный идентификатор сессии, повторите действие!'])
                 ->length($title, 5, 50, ['title' => 'Слишком длинный или короткий заголовок!'])
                 ->length($text, 5, 1000, ['text' => 'Слишком длинное или короткое описание!'])
@@ -104,6 +112,7 @@ class OfferController extends BaseController
                 $title = antimat($title);
                 $text  = antimat($text);
 
+                /** @var Offer $offer */
                 $offer = Offer::query()->create([
                     'type'       => $type,
                     'title'      => $title,
@@ -117,7 +126,7 @@ class OfferController extends BaseController
                 setFlash('success', 'Запись успешно добавлена!');
                 redirect('/offers/' . $offer->id);
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }
@@ -127,8 +136,13 @@ class OfferController extends BaseController
 
     /**
      * Редактирование записи
+     *
+     * @param int       $id
+     * @param Request   $request
+     * @param Validator $validator
+     * @return string
      */
-    public function edit($id)
+    public function edit(int $id, Request $request, Validator $validator): string
     {
         if (! $user = getUser()) {
             abort(403, 'Авторизуйтесь для редактирования записи!');
@@ -143,18 +157,17 @@ class OfferController extends BaseController
             abort(404, 'Данного предложения или проблемы не существует!');
         }
 
-        if (! in_array($offer->status, ['wait', 'process'])) {
+        if (! \in_array($offer->status, ['wait', 'process'])) {
             abort('default', 'Данное предложение или проблема уже решена или закрыта!');
         }
 
-        if (Request::isMethod('post')) {
+        if ($request->isMethod('post')) {
 
-            $token = check(Request::input('token'));
-            $title = check(Request::input('title'));
-            $text  = check(Request::input('text'));
-            $type  = check(Request::input('type'));
+            $token = check($request->input('token'));
+            $title = check($request->input('title'));
+            $text  = check($request->input('text'));
+            $type  = check($request->input('type'));
 
-            $validator = new Validator();
             $validator->equal($token, $_SESSION['token'], ['Неверный идентификатор сессии, повторите действие!'])
                 ->length($title, 5, 50, ['title' => 'Слишком длинный или короткий заголовок!'])
                 ->length($text, 5, 1000, ['text' => 'Слишком длинное или короткое описание!'])
@@ -175,7 +188,7 @@ class OfferController extends BaseController
                 setFlash('success', 'Запись успешно изменена!');
                 redirect('/offers/' . $offer->id);
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }
@@ -185,21 +198,26 @@ class OfferController extends BaseController
 
     /**
      * Комментарии
+     *
+     * @param int       $id
+     * @param Request   $request
+     * @param Validator $validator
+     * @return string
      */
-    public function comments($id)
+    public function comments(int $id, Request $request, Validator $validator): string
     {
+        /** @var Offer $offer */
         $offer = Offer::query()->find($id);
 
         if (! $offer) {
             abort(404, 'Данного предложения или проблемы не существует!');
         }
 
-        if (Request::isMethod('post')) {
+        if ($request->isMethod('post')) {
 
-            $token = check(Request::input('token'));
-            $msg   = check(Request::input('msg'));
+            $token = check($request->input('token'));
+            $msg   = check($request->input('msg'));
 
-            $validator = new Validator();
             $validator
                 ->true(getUser(), 'Для добавления комментария необходимо авторизоваться!')
                 ->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
@@ -211,6 +229,7 @@ class OfferController extends BaseController
 
                 $msg = antimat($msg);
 
+                /** @var Comment $comment */
                 $comment = Comment::query()->create([
                     'relate_type' => Offer::class,
                     'relate_id'   => $offer->id,
@@ -228,7 +247,7 @@ class OfferController extends BaseController
                 setFlash('success', 'Комментарий успешно добавлен!');
                 redirect('/offers/end/' . $offer->id);
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }
@@ -253,10 +272,18 @@ class OfferController extends BaseController
 
     /**
      * Подготовка к редактированию комментария
+     *
+     * @param int       $id
+     * @param int       $cid
+     * @param Request   $request
+     * @param Validator $validator
+     * @return string
      */
-    public function editComment($id, $cid)
+    public function editComment(int $id, int $cid, Request $request, Validator $validator): string
     {
-        $page = int(Request::input('page', 1));
+        $page = int($request->input('page', 1));
+
+        /** @var Offer $offer */
         $offer = Offer::query()->find($id);
 
         if (! $offer) {
@@ -281,12 +308,11 @@ class OfferController extends BaseController
             abort('default', 'Редактирование невозможно, прошло более 10 минут!');
         }
 
-        if (Request::isMethod('post')) {
-            $token = check(Request::input('token'));
-            $msg   = check(Request::input('msg'));
-            $page  = int(Request::input('page', 1));
+        if ($request->isMethod('post')) {
+            $token = check($request->input('token'));
+            $msg   = check($request->input('msg'));
+            $page  = int($request->input('page', 1));
 
-            $validator = new Validator();
             $validator
                 ->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
                 ->length($msg, 5, 1000, ['msg' => 'Слишком длинный или короткий комментарий!']);
@@ -301,7 +327,7 @@ class OfferController extends BaseController
                 setFlash('success', 'Комментарий успешно отредактирован!');
                 redirect('/offers/comments/' . $offer->id . '?page=' . $page);
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }
@@ -311,9 +337,12 @@ class OfferController extends BaseController
 
     /**
      * Переадресация на последнюю страницу
+     *
+     * @param int $id
      */
-    public function end($id)
+    public function end(int $id): void
     {
+        /** @var Offer $offer */
         $offer = Offer::query()->find($id);
 
         if (! $offer) {
@@ -331,9 +360,13 @@ class OfferController extends BaseController
 
     /**
      * Переход к сообщению
+     *
+     * @param int $id
+     * @param int $cid
      */
-    public function viewComment($id, $cid)
+    public function viewComment(int $id, int $cid): void
     {
+        /** @var Offer $offer */
         $offer = Offer::query()->find($id);
 
         if (! $offer) {

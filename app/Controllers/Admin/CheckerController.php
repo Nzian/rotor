@@ -2,8 +2,8 @@
 
 namespace App\Controllers\Admin;
 
-use App\Classes\Request;
 use App\Models\User;
+use Illuminate\Http\Request;
 
 class CheckerController extends AdminController
 {
@@ -21,15 +21,17 @@ class CheckerController extends AdminController
 
     /**
      * Главная страница
+     *
+     * @return string
      */
-    public function index()
+    public function index(): string
     {
         $files = $this->scanFiles('../');
         $files = str_replace('..//', '', $files);
         $diff  = [];
 
-        if (file_exists(STORAGE."/temp/checker.dat")) {
-            $filesScan = json_decode(file_get_contents(STORAGE."/temp/checker.dat"));
+        if (file_exists(STORAGE . '/temp/checker.dat')) {
+            $filesScan = json_decode(file_get_contents(STORAGE . '/temp/checker.dat'));
 
             $diff['left']  = array_diff($files, $filesScan);
             $diff['right'] = array_diff($filesScan, $files);
@@ -40,17 +42,20 @@ class CheckerController extends AdminController
 
     /**
      * Сканирование сайта
+     *
+     * @param Request $request
+     * @return void
      */
-    public function scan()
+    public function scan(Request $request): void
     {
-        $token = check(Request::input('token'));
+        $token = check($request->input('token'));
 
-        if ($token == $_SESSION['token']) {
-            if (is_writable(STORAGE."/temp")) {
+        if ($token === $_SESSION['token']) {
+            if (is_writable(STORAGE . '/temp')) {
                 $files = $this->scanFiles('../');
                 $files = str_replace('..//', '', $files);
 
-                file_put_contents(STORAGE."/temp/checker.dat", json_encode($files), LOCK_EX);
+                file_put_contents(STORAGE . '/temp/checker.dat', json_encode($files), LOCK_EX);
 
                 setFlash('success', 'Сайт успешно отсканирован!');
             } else {
@@ -65,23 +70,26 @@ class CheckerController extends AdminController
 
     /**
      * Сканирует директорию сайта
+     *
+     * @param string $dir
+     * @return array
      */
-    private function scanFiles($dir)
+    private function scanFiles($dir): array
     {
         static $state;
 
-        $files = preg_grep('/^([^.])/', scandir($dir));
+        $files = preg_grep('/^([^.])/', scandir($dir, SCANDIR_SORT_ASCENDING));
 
         foreach ($files as $file) {
-            if (is_file($dir.'/'.$file)) {
+            if (is_file($dir . '/' . $file)) {
                 $ext = getExtension($file);
 
-                if (! in_array($ext, explode(',', setting('nocheck')) )) {
-                    $state[] = $dir.'/'.$file.' / '.dateFixed(filemtime($dir.'/'.$file), 'd.m.Y H:i').' / '.formatFileSize($dir.'/'.$file);
+                if (! \in_array($ext, explode(',', setting('nocheck')), true)) {
+                    $state[] = $dir . '/' . $file . ' / ' . dateFixed(filemtime($dir . '/' . $file), 'd.m.Y H:i') . ' / ' . formatFileSize($dir . '/' . $file);
                 }
             } else {
-                $state[] = $dir.'/'.$file;
-                $this->scanFiles($dir.'/'.$file);
+                $state[] = $dir . '/' . $file;
+                $this->scanFiles($dir . '/' . $file);
             }
         }
 

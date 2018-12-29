@@ -2,11 +2,11 @@
 
 namespace App\Controllers\Admin;
 
-use App\Classes\Request;
 use App\Classes\Validator;
 use App\Models\News;
 use App\Models\Setting;
 use App\Models\User;
+use Illuminate\Http\Request;
 
 class NewsController extends AdminController
 {
@@ -24,8 +24,10 @@ class NewsController extends AdminController
 
     /**
      * Главная страница
+     *
+     * @return string
      */
-    public function index()
+    public function index(): string
     {
         $total = News::query()->count();
         $page = paginate(setting('postnews'), $total);
@@ -42,25 +44,30 @@ class NewsController extends AdminController
 
     /**
      * Редактирование новости
+     *
+     * @param int       $id
+     * @param Request   $request
+     * @param Validator $validator
+     * @return string
      */
-    public function edit($id)
+    public function edit(int $id, Request $request, Validator $validator): string
     {
-        $page = int(Request::input('page', 1));
+        /** @var News $news */
         $news = News::query()->find($id);
+        $page = int($request->input('page', 1));
 
         if (! $news) {
             abort(404, 'Новость не существует, возможно она была удалена!');
         }
 
-        if (Request::isMethod('post')) {
-            $token  = check(Request::input('token'));
-            $title  = check(Request::input('title'));
-            $text   = check(Request::input('text'));
-            $image  = Request::file('image');
-            $closed = empty(Request::input('closed')) ? 0 : 1;
-            $top    = empty(Request::input('top')) ? 0 : 1;
+        if ($request->isMethod('post')) {
+            $token  = check($request->input('token'));
+            $title  = check($request->input('title'));
+            $text   = check($request->input('text'));
+            $image  = $request->file('image');
+            $closed = empty($request->input('closed')) ? 0 : 1;
+            $top    = empty($request->input('top')) ? 0 : 1;
 
-            $validator = new Validator();
             $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
                 ->length($title, 5, 50, ['title' => 'Слишком длинный или короткий заголовок новости!'])
                 ->length($text, 5, 10000, ['text' => 'Слишком длинный или короткий текст новости!']);
@@ -77,7 +84,7 @@ class NewsController extends AdminController
                 // Удаление старой картинки
                 if ($image) {
                     deleteFile(HOME . $news->image);
-                    $upload = $news->uploadFile($image);
+                    $upload = $news->uploadFile($image, false);
                 }
 
                 $news->update([
@@ -91,7 +98,7 @@ class NewsController extends AdminController
                 setFlash('success', 'Новость успешно отредактирована!');
                 redirect('/admin/news/edit/' . $news->id . '?page=' . $page);
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }
@@ -101,18 +108,21 @@ class NewsController extends AdminController
 
     /**
      * Создание новости
+     *
+     * @param Request   $request
+     * @param Validator $validator
+     * @return string
      */
-    public function create()
+    public function create(Request $request, Validator $validator): string
     {
-        if (Request::isMethod('post')) {
-            $token  = check(Request::input('token'));
-            $title  = check(Request::input('title'));
-            $text   = check(Request::input('text'));
-            $image  = Request::file('image');
-            $closed = empty(Request::input('closed')) ? 0 : 1;
-            $top    = empty(Request::input('top')) ? 0 : 1;
+        if ($request->isMethod('post')) {
+            $token  = check($request->input('token'));
+            $title  = check($request->input('title'));
+            $text   = check($request->input('text'));
+            $image  = $request->file('image');
+            $closed = empty($request->input('closed')) ? 0 : 1;
+            $top    = empty($request->input('top')) ? 0 : 1;
 
-            $validator = new Validator();
             $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
                 ->length($title, 5, 50, ['title' => 'Слишком длинный или короткий заголовок новости!'])
                 ->length($text, 5, 10000, ['text' => 'Слишком длинный или короткий текст новости!']);
@@ -127,9 +137,10 @@ class NewsController extends AdminController
             if ($validator->isValid()) {
 
                 if ($image) {
-                    $upload = (new News())->uploadFile($image);
+                    $upload = (new News())->uploadFile($image, false);
                 }
 
+                /** @var News $news */
                 $news = News::query()->create([
                     'user_id'    => getUser('id'),
                     'title'      => $title,
@@ -149,7 +160,7 @@ class NewsController extends AdminController
                 setFlash('success', 'Новость успешно добавлена!');
                 redirect('/admin/news/edit/' . $news->id);
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }
@@ -159,14 +170,17 @@ class NewsController extends AdminController
 
     /**
      * Пересчет комментариев
+     *
+     * @param Request $request
+     * @return void
      */
-    public function restatement(): void
+    public function restatement(Request $request): void
     {
         if (! isAdmin(User::BOSS)) {
             abort(403, 'Доступ запрещен!');
         }
 
-        $token = check(Request::input('token'));
+        $token = check($request->input('token'));
 
         if ($token === $_SESSION['token']) {
 
@@ -183,20 +197,24 @@ class NewsController extends AdminController
     /**
      * Удаление новостей
      *
-     * @param int $id
+     * @param int       $id
+     * @param Request   $request
+     * @param Validator $validator
+     * @return void
+     * @throws \Exception
      */
-    public function delete($id): void
+    public function delete(int $id, Request $request, Validator $validator): void
     {
-        $page  = int(Request::input('page', 1));
-        $token = check(Request::input('token'));
+        $page  = int($request->input('page', 1));
+        $token = check($request->input('token'));
 
+        /** @var News $news */
         $news = News::query()->find($id);
 
         if (! $news) {
             abort(404, 'Новость не существует, возможно она была удалена!');
         }
 
-        $validator = new Validator();
         $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!');
 
         if ($validator->isValid()) {

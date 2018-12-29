@@ -3,7 +3,8 @@
 namespace App\Controllers;
 
 use App\Models\Rule;
-use App\Models\Smile;
+use App\Models\Sticker;
+use App\Models\StickersCategory;
 use App\Models\Status;
 use App\Models\Surprise;
 use Illuminate\Database\Capsule\Manager as DB;
@@ -12,36 +13,53 @@ class PageController extends BaseController
 {
     /**
      * Главная страница
+     *
+     * @param string $page
+     * @return string
      */
-    public function __call($action, $params)
+    public function index(string $page = 'index'): string
     {
-        if (! preg_match('|^[a-z0-9_\-]+$|i', $action)) {
+        if (
+            $page === 'menu'  ||
+            ! preg_match('|^[a-z0-9_\-]+$|i', $page) ||
+            ! file_exists(RESOURCES . '/views/main/' . $page . '.blade.php')
+        ) {
             abort(404);
         }
 
-        if (! file_exists(RESOURCES.'/views/main/'.$action.'.blade.php')){
+        return view('main/layout', compact('page'));
+    }
+
+    /**
+     * Меню
+     *
+     * @return string
+     */
+    public function menu(): string
+    {
+        if (! getUser()) {
             abort(404);
         }
 
-        if (! getUser() && $action == 'menu'){
-            abort(404);
-        }
-
-        return view('main/layout', compact('action'));
+        return view('main/layout', ['page' => 'menu']);
     }
 
     /**
      * Теги
+     *
+     * @return string
      */
-    public function tags()
+    public function tags(): string
     {
         return view('pages/tags');
     }
 
     /**
      * Правила
+     *
+     * @return string
      */
-    public function rules()
+    public function rules(): string
     {
         $rules = Rule::query()->first();
 
@@ -53,27 +71,59 @@ class PageController extends BaseController
     }
 
     /**
-     * Смайлы
+     * Стикеры
+     *
+     * @return string
      */
-    public function smiles()
+    public function stickers(): string
     {
-        $total = Smile::query()->count();
-        $page = paginate(setting('smilelist'), $total);
+        $categories = StickersCategory::query()
+            ->selectRaw('sc.id, sc.name, count(s.id) cnt')
+            ->from('stickers_categories as sc')
+            ->leftJoin('stickers as s', 's.category_id', 'sc.id')
+            ->groupBy('sc.id')
+            ->orderBy('sc.id')
+            ->get();
 
-        $smiles = Smile::query()
-            ->orderBy(DB::raw('CHAR_LENGTH(`code`)'))
+        return view('pages/stickers', compact('categories'));
+    }
+
+    /**
+     * Стикеры
+     *
+     * @param int $id
+     * @return string
+     */
+    public function stickersCategory(int $id): string
+    {
+        $category = StickersCategory::query()->where('id', $id)->first();
+
+        if (! $category) {
+            abort(404, 'Данной категории не существует!');
+        }
+
+        $total = Sticker::query()->where('category_id', $id)->count();
+        $page = paginate(setting('stickerlist'), $total);
+
+        $stickers = Sticker::query()
+            ->where('category_id', $id)
+            ->orderBy(DB::connection()->raw('CHAR_LENGTH(`code`)'))
             ->orderBy('name')
             ->limit($page->limit)
             ->offset($page->offset)
+            ->with('category')
             ->get();
 
-        return view('pages/smiles', compact('smiles', 'page'));
+        return view('pages/stickers_category', compact('category', 'stickers', 'page'));
     }
 
     /**
      * Ежегодный сюрприз
+     *
+     * @return void
+     * @throws \Exception
      */
-    public function surprise()
+    public function surprise(): void
     {
         $surprise['requiredPoint'] = 50;
         $surprise['requiredDate']  = '10.01';
@@ -105,10 +155,10 @@ class PageController extends BaseController
         }
 
         $user->update([
-            'point'     => DB::raw('point + '.$surprisePoint),
-            'money'     => DB::raw('money + '.$surpriseMoney),
-            'rating'    => DB::raw('posrating - negrating + '.$surpriseRating),
-            'posrating' => DB::raw('posrating + '.$surpriseRating),
+            'point'     => DB::connection()->raw('point + '.$surprisePoint),
+            'money'     => DB::connection()->raw('money + '.$surpriseMoney),
+            'rating'    => DB::connection()->raw('posrating - negrating + '.$surpriseRating),
+            'posrating' => DB::connection()->raw('posrating + '.$surpriseRating),
         ]);
 
         $text = 'Поздравляем с новым '.$currentYear.' годом!'.PHP_EOL.'В качестве сюрприза вы получаете '.PHP_EOL.plural($surprisePoint, setting('scorename')).PHP_EOL.plural($surpriseMoney, setting('moneyname')).PHP_EOL.$surpriseRating.' рейтинга репутации'.PHP_EOL.'Ура!!!';
@@ -127,8 +177,10 @@ class PageController extends BaseController
 
     /**
      * FAQ по сайту
+     *
+     * @return string
      */
-    public function faq()
+    public function faq(): string
     {
         return view('pages/faq');
     }
@@ -136,8 +188,10 @@ class PageController extends BaseController
 
     /**
      * FAQ по статусам
+     *
+     * @return string
      */
-    public function statusfaq()
+    public function statusfaq(): string
     {
         $statuses = Status::query()
             ->orderBy('topoint', 'desc')

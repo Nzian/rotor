@@ -2,7 +2,7 @@
 
 namespace App\Classes;
 
-use App\Models\Smile;
+use App\Models\Sticker;
 use Illuminate\Database\Capsule\Manager as DB;
 
 /**
@@ -22,7 +22,7 @@ class BBCode
     /**
      * @var array
      */
-    protected $parsers = [
+    protected static $parsers = [
         'code' => [
             'pattern'  => '/\[code\](.+?)\[\/code\]/s',
             'callback' => 'highlightCode'
@@ -108,6 +108,10 @@ class BBCode
             'pattern' => '/\[youtube\](.*youtu(?:\.be\/|be\.com\/.*(?:vi?\/?=?|embed\/)))([\w-]{11}).*\[\/youtube\]/U',
             'replace' => '<div class="embed-responsive embed-responsive-16by9"><iframe class="embed-responsive-item" src="//www.youtube.com/embed/$2" allowfullscreen></iframe></div>',
         ],
+        'username' => [
+            'pattern' => '/(?<=^|\s)@([\w\-]{3,20}+)(?=(\s|,))/',
+            'replace' => '<a href="/users/$1">$0</a>',
+        ],
     ];
 
     /**
@@ -120,8 +124,7 @@ class BBCode
     {
         $source = nl2br($source, false);
 
-        foreach ($this->parsers as $parser) {
-
+        foreach (self::$parsers as $parser) {
             $iterate = $parser['iterate'] ?? 1;
 
             for ($i = 0; $i < $iterate; $i++) {
@@ -213,7 +216,7 @@ class BBCode
      */
     public function highlightCode($match): string
     {
-        //Чтобы bb-код и смайлы не работали внутри тега [code]
+        //Чтобы bb-код и стикеры не работали внутри тега [code]
         $match[1] = strtr($match[1], [':' => '&#58;', '[' => '&#91;']);
 
         return '<pre class="prettyprint linenums pre-scrollable">' . $match[1] . '</pre>';
@@ -250,40 +253,38 @@ class BBCode
     }
 
     /**
-     * Обрабатывет смайлы
+     * Обрабатывет стикеры
      *
      * @param $source
      * @return string Обработанный текст
-     * @internal param string $text Необработанный текст
      */
-    public function parseSmiles($source): string
+    public function parseStickers($source): string
     {
-        static $listSmiles;
+        static $listStickers;
 
-        if (empty($listSmiles)) {
-            if (! file_exists(STORAGE . '/temp/smiles.dat')) {
-
-                $smiles = Smile::query()
+        if (empty($listStickers)) {
+            if (! file_exists(STORAGE . '/temp/stickers.dat')) {
+                $stickers = Sticker::query()
                     ->select('code', 'name')
-                    ->orderBy(DB::raw('CHAR_LENGTH(code)'), 'desc')
+                    ->orderBy(DB::connection()->raw('CHAR_LENGTH(code)'), 'desc')
                     ->get()
                     ->toArray();
 
-                $smilesCode = array_column($smiles, 'code');
-                $smilesName = array_column($smiles, 'name');
+                $stickers = array_column($stickers, 'name', 'code');
 
-                $smilesName = array_map(
-                    function($smile) {
-                        return str_replace($smile, '<img src="' . $smile . '" alt="' . basename($smile) . '">', $smile);
-                    }, $smilesName);
+                $stickers = array_map(
+                    function($sticker) {
+                        return '<img src="' . $sticker . '" alt="' . basename($sticker) . '">';
+                    }, $stickers
+                );
 
-                file_put_contents(STORAGE . '/temp/smiles.dat', json_encode(['codes' => $smilesCode, 'names' => $smilesName]));
+                file_put_contents(STORAGE . '/temp/stickers.dat', json_encode($stickers));
             }
 
-            $listSmiles = json_decode(file_get_contents(STORAGE . '/temp/smiles.dat'));
+            $listStickers = json_decode(file_get_contents(STORAGE . '/temp/stickers.dat'), true);
         }
 
-        return str_replace($listSmiles->codes, $listSmiles->names, $source);
+        return strtr($source, $listStickers);
     }
 
     /**
@@ -296,7 +297,7 @@ class BBCode
      */
     public function setParser($name, $pattern, $replace): void
     {
-        $this->parsers[$name] = [
+        self::$parsers[$name] = [
             'pattern' => $pattern,
             'replace' => $replace
         ];
@@ -310,8 +311,8 @@ class BBCode
      */
     public function only($only = null)
     {
-        $only = is_array($only) ? $only : func_get_args();
-        $this->parsers = $this->arrayOnly($only);
+        $only = \is_array($only) ? $only : \func_get_args();
+        self::$parsers = $this->arrayOnly($only);
         return $this;
     }
 
@@ -323,8 +324,8 @@ class BBCode
      */
     public function except($except = null)
     {
-        $except = is_array($except) ? $except : func_get_args();
-        $this->parsers = $this->arrayExcept($except);
+        $except = \is_array($except) ? $except : \func_get_args();
+        self::$parsers = $this->arrayExcept($except);
         return $this;
     }
 
@@ -335,7 +336,7 @@ class BBCode
      */
     public function getParsers(): array
     {
-        return $this->parsers;
+        return self::$parsers;
     }
 
     /**
@@ -346,7 +347,7 @@ class BBCode
      */
     private function arrayOnly(array $only): array
     {
-        return array_intersect_key($this->parsers, array_flip($only));
+        return array_intersect_key(self::$parsers, array_flip($only));
     }
 
     /**
@@ -354,10 +355,9 @@ class BBCode
      *
      * @param array $excepts
      * @return array parsers
-     * @internal param array $except parsers to exclude
      */
     private function arrayExcept(array $excepts): array
     {
-        return array_diff_key($this->parsers, array_flip($excepts));
+        return array_diff_key(self::$parsers, array_flip($excepts));
     }
 }

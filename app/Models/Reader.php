@@ -2,15 +2,17 @@
 
 namespace App\Models;
 
+/**
+ * Class Reader
+ *
+ * @property int id
+ * @property string relate_type
+ * @property int relate_id
+ * @property string ip
+ * @property int created_at
+ */
 class Reader extends BaseModel
 {
-    /**
-     * The table associated with the model.
-     *
-     * @var string
-     */
-    protected $table = 'readers';
-
     /**
      * Indicates if the model should be timestamped.
      *

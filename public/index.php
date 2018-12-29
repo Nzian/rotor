@@ -8,6 +8,7 @@
  * @copyright 2005-2018
  */
 
-include_once __DIR__.'/../app/start.php';
+require __DIR__ . '/../app/bootstrap.php';
 
-App\Classes\Application::run();
+$app = new \App\Classes\Application();
+$app->run();

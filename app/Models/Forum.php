@@ -2,6 +2,26 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
+/**
+ * Class Forum
+ *
+ * @property int id
+ * @property int sort
+ * @property int parent_id
+ * @property string title
+ * @property string description
+ * @property int count_topics
+ * @property int count_posts
+ * @property int last_topic_id
+ * @property int closed
+ * @property Forum parent
+ * @property Collection children
+ * @property Topic lastTopic
+ */
 class Forum extends BaseModel
 {
     /**
@@ -20,24 +40,30 @@ class Forum extends BaseModel
 
     /**
      * Возвращает связь родительского форума
+     *
+     * @return BelongsTo
      */
-    public function parent()
+    public function parent(): BelongsTo
     {
         return $this->belongsTo(self::class, 'parent_id')->withDefault();
     }
 
     /**
      * Возвращает связь подкатегорий форума
+     *
+     * @return HasMany
      */
-    public function children()
+    public function children(): HasMany
     {
         return $this->hasMany(self::class, 'parent_id')->orderBy('sort');
     }
 
     /**
      * Возвращает связь последней темы
+     *
+     * @return BelongsTo
      */
-    public function lastTopic()
+    public function lastTopic(): BelongsTo
     {
         return $this->belongsTo(Topic::class, 'last_topic_id')->withDefault();
     }

@@ -2,29 +2,35 @@
 
 namespace App\Controllers\User;
 
-use App\Classes\Request;
 use App\Controllers\BaseController;
 use App\Models\User;
+use Illuminate\Http\Request;
 
 class SearchController extends BaseController
 {
     /**
      * Главная страница
+     *
+     * @return string
      */
-    public function index()
+    public function index(): string
     {
         return view('users/search');
     }
 
     /**
      * Поиск пользователя
+     *
+     * @param Request $request
+     * @return string
      */
-    public function search()
+    public function search(Request $request): string
     {
-        $find = check(Request::input('find'));
+        $find   = check($request->input('find'));
+        $strlen = utfStrlen($find);
 
-        if (utfStrlen($find) < 2 || utfStrlen($find) > 20) {
-            setInput(Request::all());
+        if ($strlen < 2 || $strlen > 20) {
+            setInput($request->all());
             setFlash('danger', ['find' => 'Слишком короткий или длинный запрос, от 2 до 20 символов!']);
             redirect('/searchusers');
         }
@@ -41,8 +47,11 @@ class SearchController extends BaseController
 
     /**
      * Поиск по первой букве
+     *
+     * @param string $letter
+     * @return string
      */
-    public function sort($letter)
+    public function sort(string $letter): string
     {
         $search = is_numeric($letter) ? "RLIKE '^[-0-9]'" : "LIKE '$letter%'";
 

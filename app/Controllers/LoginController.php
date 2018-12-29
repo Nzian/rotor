@@ -14,14 +14,14 @@ class LoginController extends BaseController
         parent::__construct();
 
         if (! getUser()) {
-            abort(403, 'Для просмотра истории необходимо авторизоваться');
+            abort(403, 'Для просмотра истории необходимо авторизоваться!');
         }
     }
 
     /**
      * Главная страница
      */
-    public function index()
+    public function index(): string
     {
         $total = Login::query()->where('user_id', getUser('id'))->count();
         $page = paginate(setting('loginauthlist'), $total);

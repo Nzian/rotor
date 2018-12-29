@@ -2,10 +2,10 @@
 
 namespace App\Controllers\Admin;
 
-use App\Classes\Request;
 use App\Classes\Validator;
 use App\Models\Banhist;
 use App\Models\User;
+use Illuminate\Http\Request;
 
 class BanController extends AdminController
 {
@@ -20,18 +20,24 @@ class BanController extends AdminController
 
     /**
      * Главная страница
+     *
+     * @return string
      */
-    public function index()
+    public function index(): string
     {
         return view('admin/bans/index');
     }
 
     /**
      * Бан пользователя
+     *
+     * @param Request   $request
+     * @param Validator $validator
+     * @return string
      */
-    public function edit()
+    public function edit(Request $request, Validator $validator): string
     {
-        $login = check(Request::input('user'));
+        $login = check($request->input('user'));
 
         $user = User::query()->where('login', $login)->with('lastBan')->first();
 
@@ -39,20 +45,19 @@ class BanController extends AdminController
             abort(404, 'Пользователь не найден!');
         }
 
-        if (in_array($user->level, User::ADMIN_GROUPS)) {
+        if (\in_array($user->level, User::ADMIN_GROUPS, true)) {
             abort('default', 'Запрещено банить администрацию сайта!');
         }
 
-        if (Request::isMethod('post')) {
-            $token  = check(Request::input('token'));
-            $time   = int(Request::input('time'));
-            $type   = check(Request::input('type'));
-            $reason = check(Request::input('reason'));
-            $notice = check(Request::input('notice'));
+        if ($request->isMethod('post')) {
+            $token  = check($request->input('token'));
+            $time   = int($request->input('time'));
+            $type   = check($request->input('type'));
+            $reason = check($request->input('reason'));
+            $notice = check($request->input('notice'));
 
-            $validator = new Validator();
             $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
-                ->false($user->level == User::BANNED && $user->timeban > SITETIME, 'Данный аккаунт уже заблокирован!')
+                ->false($user->level === User::BANNED && $user->timeban > SITETIME, 'Данный аккаунт уже заблокирован!')
                 ->gt($time, 0, ['time' => 'Вы не указали время бана!'])
                 ->in($type, ['minutes', 'hours', 'days'], ['type', 'Не выбрано время бана!'])
                 ->length($reason, 5, 1000, ['reason' => 'Слишком длинная или короткая причина бана!'])
@@ -61,11 +66,11 @@ class BanController extends AdminController
             if ($validator->isValid()) {
 
                 if ($type === 'days') {
-                    $time = $time * 3600 * 24;
+                    $time *= 86400;
                 } elseif ($type === 'hours') {
-                    $time = $time * 3600;
+                    $time *= 3600;
                 } else {
-                    $time = $time * 60;
+                    $time *= 60;
                 }
 
                 $user->update([
@@ -91,7 +96,7 @@ class BanController extends AdminController
                 setFlash('success', 'Пользователь успешно заблокирован!');
                 redirect('/admin/bans/edit?user=' . $user->login);
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }
@@ -101,10 +106,14 @@ class BanController extends AdminController
 
     /**
      * Изменение бана
+     *
+     * @param Request   $request
+     * @param Validator $validator
+     * @return string
      */
-    public function change()
+    public function change(Request $request, Validator $validator): string
     {
-        $login = check(Request::input('user'));
+        $login = check($request->input('user'));
 
         $user = User::query()->where('login', $login)->with('lastBan')->first();
 
@@ -116,15 +125,14 @@ class BanController extends AdminController
             abort('default', 'Данный пользователь не забанен!');
         }
 
-        if (Request::isMethod('post')) {
-            $token   = check(Request::input('token'));
-            $timeban = check(Request::input('timeban'));
-            $reason  = check(Request::input('reason'));
+        if ($request->isMethod('post')) {
+            $token   = check($request->input('token'));
+            $timeban = check($request->input('timeban'));
+            $reason  = check($request->input('reason'));
 
             $timeban = strtotime($timeban);
             $term    = $timeban - SITETIME;
 
-            $validator = new Validator();
             $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
                 ->gt($term, 0, ['timeban' => 'Слишком маленькое время бана!'])
                 ->length($reason, 5, 1000, ['reason' => 'Слишком длинная или короткая причина бана!']);
@@ -148,7 +156,7 @@ class BanController extends AdminController
                 setFlash('success', 'Данные успешно изменены!');
                 redirect('/admin/bans/edit?user=' . $user->login);
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }
@@ -158,11 +166,15 @@ class BanController extends AdminController
 
     /**
      * Снятие бана
+     *
+     * @param Request   $request
+     * @param Validator $validator
+     * @return void
      */
-    public function unban()
+    public function unban(Request $request, Validator $validator): void
     {
-        $token = check(Request::input('token'));
-        $login = check(Request::input('user'));
+        $token = check($request->input('token'));
+        $login = check($request->input('user'));
 
         $user = User::query()->where('login', $login)->with('lastBan')->first();
 
@@ -174,7 +186,6 @@ class BanController extends AdminController
             abort('default', 'Данный пользователь не забанен!');
         }
 
-        $validator = new Validator();
         $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!');
 
         if ($validator->isValid()) {

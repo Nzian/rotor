@@ -27,11 +27,11 @@
                 <select class="form-control" id="inputCategory" name="cid">
 
                     @foreach ($cats as $data)
-                        <option value="{{ $data->id }}"{{ ($inputCategory == $data->id && ! $data->closed) ? ' selected' : '' }}{{ $data->closed ? ' disabled' : '' }}>{{ $data->name }}</option>
+                        <option value="{{ $data->id }}"{{ ($inputCategory === $data->id && ! $data->closed) ? ' selected' : '' }}{{ $data->closed ? ' disabled' : '' }}>{{ $data->name }}</option>
 
                         @if ($data->children->isNotEmpty())
                             @foreach($data->children as $datasub)
-                                <option value="{{ $datasub->id }}"{{ ($inputCategory == $datasub->id && ! $datasub->closed) ? ' selected' : '' }}{{ $datasub->closed ? ' disabled' : '' }}>– {{ $datasub->name }}</option>
+                                <option value="{{ $datasub->id }}"{{ ($inputCategory === $datasub->id && ! $datasub->closed) ? ' selected' : '' }}{{ $datasub->closed ? ' disabled' : '' }}>– {{ $datasub->name }}</option>
                             @endforeach
                         @endif
                     @endforeach
@@ -68,6 +68,6 @@
     Метки статьи должны быть от 2 до 20 символов с общей длиной не более 50 символов<br><br>
 
     <a href="/rules">Правила</a> /
-    <a href="/smiles">Смайлы</a> /
+    <a href="/stickers">Стикеры</a> /
     <a href="/tags">Теги</a><br><br>
 @stop

@@ -5,9 +5,6 @@
 @stop
 
 @section('content')
-
-    <h1>Публикация нового файла</h1>
-
     <nav>
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="/"><i class="fas fa-home"></i></a></li>
@@ -15,6 +12,8 @@
             <li class="breadcrumb-item active">Публикация</li>
         </ol>
     </nav>
+
+    <h1>Публикация нового файла</h1>
 
     <form action="/downs/create" method="post" enctype="multipart/form-data">
         <input type="hidden" name="token" value="{{ $_SESSION['token'] }}">
@@ -25,11 +24,11 @@
             <select class="form-control" id="inputCategory" name="cid">
                 @foreach ($loads as $data)
 
-                    <option value="{{ $data->id }}"{{ ($cid == $data->id && ! $data->closed) ? ' selected' : '' }}{{ $data->closed ? ' disabled' : '' }}>{{ $data->name }}</option>
+                    <option value="{{ $data->id }}"{{ ($cid === $data->id && ! $data->closed) ? ' selected' : '' }}{{ $data->closed ? ' disabled' : '' }}>{{ $data->name }}</option>
 
                     @if ($data->children->isNotEmpty())
                         @foreach($data->children as $datasub)
-                            <option value="{{ $datasub->id }}"{{ $cid == $datasub->id && ! $datasub->closed ? ' selected' : '' }}{{ $datasub->closed ? ' disabled' : '' }}>– {{ $datasub->name }}</option>
+                            <option value="{{ $datasub->id }}"{{ $cid === $datasub->id && ! $datasub->closed ? ' selected' : '' }}{{ $datasub->closed ? ' disabled' : '' }}>– {{ $datasub->name }}</option>
                         @endforeach
                     @endif
                 @endforeach

@@ -99,7 +99,7 @@
                     <div class="b" id="post_{{ $data->id }}">
                         <div class="float-right text-right">
                             @if (getUser())
-                                @if (getUser('id') != $data->user_id)
+                                @if (getUser('id') !== $data->user_id)
                                     <a href="#" onclick="return postReply(this)" title="Ответить"><i class="fa fa-reply text-muted"></i></a>
 
                                     <a href="#" onclick="return postQuote(this)" title="Цитировать"><i class="fa fa-quote-right text-muted"></i></a>
@@ -113,12 +113,12 @@
                             @endif
 
                             <div class="js-rating">
-                                @if (getUser() && getUser('id') != $data->user_id)
-                                    <a class="post-rating-down{{ $data->vote == '-' ? ' active' : '' }}" href="#" onclick="return changeRating(this);" data-id="{{ $data->id }}" data-type="{{ App\Models\Post::class }}" data-vote="-" data-token="{{ $_SESSION['token'] }}"><i class="fa fa-minus"></i></a>
+                                @if (getUser() && getUser('id') !== $data->user_id)
+                                    <a class="post-rating-down{{ $data->vote === '-' ? ' active' : '' }}" href="#" onclick="return changeRating(this);" data-id="{{ $data->id }}" data-type="{{ App\Models\Post::class }}" data-vote="-" data-token="{{ $_SESSION['token'] }}"><i class="fa fa-minus"></i></a>
                                 @endif
                                 <span>{!! formatNum($data->rating) !!}</span>
-                                @if (getUser() && getUser('id') != $data->user_id)
-                                    <a class="post-rating-up{{ $data->vote == '+' ? ' active' : '' }}" href="#" onclick="return changeRating(this);" data-id="{{ $data->id }}" data-type="{{ App\Models\Post::class }}" data-vote="+" data-token="{{ $_SESSION['token'] }}"><i class="fa fa-plus"></i></a>
+                                @if (getUser() && getUser('id') !== $data->user_id)
+                                    <a class="post-rating-up{{ $data->vote === '+' ? ' active' : '' }}" href="#" onclick="return changeRating(this);" data-id="{{ $data->id }}" data-type="{{ App\Models\Post::class }}" data-vote="+" data-token="{{ $_SESSION['token'] }}"><i class="fa fa-plus"></i></a>
                                 @endif
                             </div>
                         </div>
@@ -219,7 +219,7 @@
         {!! showError('Для добавления сообщения необходимо авторизоваться') !!}
     @endif
 
-    <a href="/smiles">Смайлы</a>  /
+    <a href="/stickers">Стикеры</a>  /
     <a href="/tags">Теги</a>  /
     <a href="/rules">Правила</a> /
     <a href="/forums/top/topics">Топ тем</a> /

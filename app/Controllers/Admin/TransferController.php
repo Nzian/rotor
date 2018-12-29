@@ -2,15 +2,17 @@
 
 namespace App\Controllers\Admin;
 
-use App\Classes\Request;
 use App\Models\Transfer;
+use Illuminate\Http\Request;
 
 class TransferController extends AdminController
 {
     /**
      * Главная страница
+     *
+     * @return string
      */
-    public function index()
+    public function index(): string
     {
         $total = Transfer::query()->count();
         $page = paginate(setting('listtransfers'), $total);
@@ -27,10 +29,13 @@ class TransferController extends AdminController
 
     /**
      * Просмотр всех переводов
+     *
+     * @param Request $request
+     * @return string
      */
-    public function view()
+    public function view(Request $request): string
     {
-        $login = check(Request::input('user'));
+        $login = check($request->input('user'));
 
         if (! $user = getUserByLogin($login)) {
             abort(404, 'Пользователь с данным логином не найден!');

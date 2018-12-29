@@ -5,10 +5,9 @@
 @stop
 
 @section('content')
-
     @foreach ($downs as $down)
         <?php $down->text = bbCode($down->text); ?>
-        <?php $down->text = str_replace('/uploads/smiles', siteUrl().'/uploads/smiles', $down->text); ?>
+        <?php $down->text = str_replace('/uploads/stickers', siteUrl().'/uploads/stickers', $down->text); ?>
 
         <item>
             <title>{{ $down->title }}</title>

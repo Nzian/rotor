@@ -2,13 +2,13 @@
 
 namespace App\Controllers;
 
-use App\Classes\Request;
 use App\Classes\Validator;
 use App\Models\Comment;
 use App\Models\Flood;
 use App\Models\News;
 use App\Models\User;
 use Illuminate\Database\Capsule\Manager as DB;
+use Illuminate\Http\Request;
 
 class NewsController extends BaseController
 {
@@ -32,8 +32,11 @@ class NewsController extends BaseController
 
     /**
      * Вывод новости
+     *
+     * @param int $id
+     * @return string
      */
-    public function view($id)
+    public function view(int $id): string
     {
         $news = News::query()->find($id);
 
@@ -58,20 +61,25 @@ class NewsController extends BaseController
 
     /**
      * Комментарии
+     *
+     * @param int       $id
+     * @param Request   $request
+     * @param Validator $validator
+     * @return string
      */
-    public function comments($id)
+    public function comments(int $id, Request $request, Validator $validator): string
     {
+        /** @var News $news */
         $news = News::query()->find($id);
 
         if (! $news) {
             abort(404, 'Новость не существует, возможно она была удалена!');
         }
 
-        if (Request::isMethod('post')) {
-            $msg   = check(Request::input('msg'));
-            $token = check(Request::input('token'));
+        if ($request->isMethod('post')) {
+            $msg   = check($request->input('msg'));
+            $token = check($request->input('token'));
 
-            $validator = new Validator();
             $validator->true(getUser(), 'Чтобы добавить комментарий необходимо авторизоваться')
                 ->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
                 ->equal(Flood::isFlood(), true, ['msg' => 'Антифлуд! Разрешается комментировать раз в ' . Flood::getPeriod() . ' сек!'])
@@ -81,6 +89,7 @@ class NewsController extends BaseController
             if ($validator->isValid()) {
                 $msg = antimat($msg);
 
+                /** @var Comment $comment */
                 $comment = Comment::query()->create([
                     'relate_type' => News::class,
                     'relate_id'   => $news->id,
@@ -93,9 +102,9 @@ class NewsController extends BaseController
 
                 $user = User::query()->where('id', getUser('id'));
                 $user->update([
-                    'allcomments' => DB::raw('allcomments + 1'),
-                    'point'       => DB::raw('point + 1'),
-                    'money'       => DB::raw('money + 5'),
+                    'allcomments' => DB::connection()->raw('allcomments + 1'),
+                    'point'       => DB::connection()->raw('point + 1'),
+                    'money'       => DB::connection()->raw('money + 5'),
                 ]);
 
                 $news->increment('count_comments');
@@ -104,14 +113,14 @@ class NewsController extends BaseController
 
                 setFlash('success', 'Комментарий успешно добавлен!');
 
-                if (Request::has('read')) {
+                if ($request->has('read')) {
                     redirect('/news/' . $news->id);
                 }
 
                 redirect('/news/end/' . $news->id . '');
 
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }
@@ -137,10 +146,18 @@ class NewsController extends BaseController
 
     /**
      * Редактирование комментария
+     *
+     * @param int       $id
+     * @param int       $cid
+     * @param Request   $request
+     * @param Validator $validator
+     * @return string
      */
-    public function editComment($id, $cid)
+    public function editComment(int $id, int $cid, Request $request, Validator $validator): string
     {
-        $page = int(Request::input('page', 1));
+        $page = int($request->input('page', 1));
+
+        /** @var News $news */
         $news = News::query()->find($id);
 
         if (! $news) {
@@ -165,11 +182,10 @@ class NewsController extends BaseController
             abort('default', 'Редактирование невозможно, прошло более 10 минут!');
         }
 
-        if (Request::isMethod('post')) {
-            $msg   = check(Request::input('msg'));
-            $token = check(Request::input('token'));
+        if ($request->isMethod('post')) {
+            $msg   = check($request->input('msg'));
+            $token = check($request->input('token'));
 
-            $validator = new Validator();
             $validator
                 ->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
                 ->length($msg, 5, 1000, ['msg' => 'Слишком длинный или короткий комментарий!']);
@@ -184,7 +200,7 @@ class NewsController extends BaseController
                 setFlash('success', 'Комментарий успешно отредактирован!');
                 redirect('/news/comments/' . $news->id . '?page=' . $page);
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }
@@ -193,9 +209,12 @@ class NewsController extends BaseController
 
     /**
      * Переадресация на последнюю страницу
+     *
+     * @param $id
      */
-    public function end($id)
+    public function end($id): void
     {
+        /** @var News $news */
         $news = News::query()->find($id);
 
         if (empty($news)) {
@@ -248,9 +267,13 @@ class NewsController extends BaseController
 
     /**
      * Переход к сообщению
+     *
+     * @param int $id
+     * @param int $cid
      */
-    public function viewComment($id, $cid)
+    public function viewComment(int $id, int $cid): void
     {
+        /** @var News $news */
         $news = News::query()->find($id);
 
         if (! $news) {

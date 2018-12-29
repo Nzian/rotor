@@ -65,6 +65,12 @@ $(function() {
     });
 
     $('.phone').mask('0 000 000-00-00');
+
+ /*   if($('.markItUpEditor').val().length > 0) {
+        window.onbeforeunload = function() {
+            return "You're about to end your session, are you sure?";
+        }
+    }*/
 });
 
 /* Вывод уведомлений */
@@ -97,7 +103,7 @@ function postReply(el)
     var post   = $(el).closest('.post');
     var author = post.find('.author').data('login');
 
-    separ = field.val().length ? '\n' : '';
+    var separ = field.val().length ? '\n' : '';
     field.focus().val(field.val() + separ + '@' + author + ', ');
 
     return false;
@@ -117,7 +123,7 @@ function postQuote(el)
     var text    = post.find('.message').clone();
     var message = text.find("blockquote").remove().end().text();
 
-    separ = field.val().length ? '\n' : '';
+    var separ = field.val().length ? '\n' : '';
     field.focus().val(field.val() + separ + '[quote=@' + author + ' ' + date + ']' + $.trim(message) + '[/quote]\n');
 
     return false;
@@ -474,6 +480,15 @@ function deleteImage(el)
             }
         }
     });
+
+    return false;
+}
+
+/* Показывает форму для повторной отправки код подтверждения */
+function resendingCode(el)
+{
+    $('.js-resending-link').hide();
+    $('.js-resending-form').show();
 
     return false;
 }

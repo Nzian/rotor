@@ -2,9 +2,9 @@
 
 namespace App\Controllers\Admin;
 
-use App\Classes\Request;
 use App\Models\Log;
 use App\Models\User;
+use Illuminate\Http\Request;
 
 class LogController extends AdminController
 {
@@ -22,8 +22,10 @@ class LogController extends AdminController
 
     /**
      * Главная страница
+     *
+     * @return string
      */
-    public function index()
+    public function index(): string
     {
         $total = Log::query()->count();
         $page = paginate(setting('loglist'), $total);
@@ -40,12 +42,15 @@ class LogController extends AdminController
 
     /**
      * Очистка логов
+     *
+     * @param Request $request
+     * @return void
      */
-    public function clear()
+    public function clear(Request $request): void
     {
-        $token = check(Request::input('token'));
+        $token = check($request->input('token'));
 
-        if ($token == $_SESSION['token']) {
+        if ($token === $_SESSION['token']) {
 
             Log::query()->truncate();
 

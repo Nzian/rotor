@@ -2,10 +2,10 @@
 
 namespace App\Controllers;
 
-use App\Classes\Request;
 use App\Classes\Validator;
 use App\Models\Contact;
 use App\Models\User;
+use Illuminate\Http\Request;
 
 class ContactController extends BaseController
 {
@@ -23,15 +23,19 @@ class ContactController extends BaseController
 
     /**
      * Главная страница
+     *
+     * @param Request   $request
+     * @param Validator $validator
+     * @return string
      */
-    public function index()
+    public function index(Request $request, Validator $validator): string
     {
-        if (Request::isMethod('post')) {
-            $page  = int(Request::input('page', 1));
-            $token = check(Request::input('token'));
-            $login = check(Request::input('user'));
+        $login = check($request->input('user'));
 
-            $validator = new Validator();
+        if ($request->isMethod('post')) {
+            $page  = int($request->input('page', 1));
+            $token = check($request->input('token'));
+
             $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!');
 
             $user = User::query()->where('login', $login)->first();
@@ -55,15 +59,15 @@ class ContactController extends BaseController
                 ]);
 
                 if (! $user->isIgnore(getUser())) {
-                    $message = 'Пользователь [b]'.getUser('login').'[/b] добавил вас в свой контакт-лист!';
-                    $user->sendMessage(getUser(), $message);
+                    $message = 'Пользователь @' . getUser('login') . ' добавил вас в свой контакт-лист!';
+                    $user->sendMessage(null, $message);
                 }
 
                 setFlash('success', 'Пользователь успешно добавлен в контакт-лист!');
                 redirect('/contacts?page='.$page);
 
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }
@@ -79,13 +83,18 @@ class ContactController extends BaseController
             ->with('contactor')
             ->get();
 
-        return view('contacts/index', compact('contacts', 'page'));
+        return view('contacts/index', compact('contacts', 'page', 'login'));
     }
 
     /**
      * Заметка для пользователя
+     *
+     * @param int       $id
+     * @param Request   $request
+     * @param Validator $validator
+     * @return string
      */
-    public function note($id)
+    public function note(int $id, Request $request, Validator $validator): string
     {
         $contact = Contact::query()
             ->where('user_id', getUser('id'))
@@ -96,12 +105,11 @@ class ContactController extends BaseController
             abort(404, 'Запись не найдена');
         }
 
-        if (Request::isMethod('post')) {
+        if ($request->isMethod('post')) {
 
-            $token = check(Request::input('token'));
-            $msg   = check(Request::input('msg'));
+            $token = check($request->input('token'));
+            $msg   = check($request->input('msg'));
 
-            $validator = new Validator();
             $validator->equal($token, $_SESSION['token'], ['msg' => 'Неверный идентификатор сессии, повторите действие!'])
                 ->length($msg, 0, 1000, ['msg' => 'Слишком большая заметка, не более 1000 символов!']);
 
@@ -114,7 +122,7 @@ class ContactController extends BaseController
                 setFlash('success', 'Заметка успешно отредактирована!');
                 redirect('/contacts');
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }
@@ -124,14 +132,17 @@ class ContactController extends BaseController
 
     /**
      * Удаление контактов
+     *
+     * @param Request   $request
+     * @param Validator $validator
+     * @return void
      */
-    public function delete()
+    public function delete(Request $request, Validator $validator): void
     {
-        $page  = int(Request::input('page', 1));
-        $token = check(Request::input('token'));
-        $del   = intar(Request::input('del'));
+        $page  = int($request->input('page', 1));
+        $token = check($request->input('token'));
+        $del   = intar($request->input('del'));
 
-        $validator = new Validator();
         $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
             ->true($del, 'Отсутствуют выбранные пользователи для удаления!');
 

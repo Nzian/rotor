@@ -27,33 +27,44 @@
     <b>6</b>. Общаться по внутренней почте сайта с пользователями сайта, писать под своим аккаунтом в гостевой, комментариях, форуме<br>
     <b>7</b>. Участвовать в голосованиях на различные темы<br>
     <b>8</b>. Добавлять свои объявления, на определенный срок (Купля,продажа,вакансии,услуги,обмен и т.д.)<br>
-    <b>9</b>. Изменять под себя настройки сайта, в частности количество показываемых сообщений в любых сервисах (гостевая, форум и пр.) Чем можно снизить трафик передаваемой информации<br>
+    <b>9</b>. Изменять под себя настройки сайта<br>
 
     <br>При наборе определенного количества актива, пользователю открываются новые возможности:<br>
 
-    @if (!empty(setting('addofferspoint')))
-        <b>{{ plural(setting('addofferspoint'), setting('scorename')) }}</b> - создание тем в "Предложенияx и проблемах"<br>
+    @if (setting('rekuserpoint'))
+        <b>{{ plural(setting('rekuserpoint'), setting('scorename')) }}</b> - добавление рекламных ссылок<br>
     @endif
 
-    @if (!empty(setting('forumloadpoints')))
+    @if (setting('privatprotect'))
+        <b>{{ plural(setting('privatprotect'), setting('scorename')) }}</b> - отключается captcha для некоторых действий<br>
+    @endif
+
+
+    @if (setting('addofferspoint'))
+        <b>{{ plural(setting('addofferspoint'), setting('scorename')) }}</b> - создание тем в "Предложениях и проблемах"<br>
+    @endif
+
+    @if (setting('forumloadpoints'))
         <b>{{ plural(setting('forumloadpoints'), setting('scorename')) }}</b> - Прикрепление файлов в форуме<br>
     @endif
 
-    @if (!empty(setting('sendmoneypoint')))
+    @if (setting('sendmoneypoint'))
         <b>{{ plural(setting('sendmoneypoint'), setting('scorename')) }}</b> - перечисление игровых денег<br>
     @endif
 
-    @if (!empty(setting('editratingpoint')))
+    @if (setting('editratingpoint'))
         <b>{{ plural(setting('editratingpoint'), setting('scorename')) }}</b> - изменение репутации пользователям<br>
     @endif
 
-    @if (!empty(setting('editforumpoint')))
+    @if (setting('editforumpoint'))
         <b>{{ plural(setting('editforumpoint'), setting('scorename')) }}</b> - изменение и закрытие своих тем на форуме<br>
     @endif
 
-    @if (!empty(setting('advertpoint')))
+    @if (setting('advertpoint'))
         <b>{{ plural(setting('advertpoint'), setting('scorename')) }}</b> - исчезает вся реклама на главной странице сайта<br>
     @endif
+
+    Также чем больше баллов тем меньше время антифлуда<br>
 
     <br>
 
@@ -61,7 +72,7 @@
     <b>1</b>. Вводите желаемый логин и пароль<br>
     <b>2</b>. Указываете свой email и проверочный код<br>
     <b>3</b>. Нажимаете кнопку регистрации и создается ваш профиль<br>
-    <b>4</b>. Теперь если включена функция подтверждения регистрации, то вам на email будет выслан мастер-ключ, который необходим для подтверждения регистрации<br>
+    <b>4</b>. Теперь если включена функция подтверждения регистрации, то вам на email будет выслан код подтверждения, который необходим для окончания регистрации<br>
     <b>5</b>. Если подтверждение регистрации выключено, то после входа на сайт вы становитесь полноправным пользователем сайта<br>
     <b>6</b>. Теперь вы можете добавить побольше информации о себе в профиле, а также изменить свои настройки<br>
 

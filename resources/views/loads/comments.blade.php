@@ -5,9 +5,6 @@
 @stop
 
 @section('content')
-
-    <h1>{{ $down->title }} - Комментарии</h1>
-
     <nav>
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="/"><i class="fas fa-home"></i></a></li>
@@ -25,6 +22,8 @@
         </ol>
     </nav>
 
+    <h1>{{ $down->title }} - Комментарии</h1>
+
     @if ($comments->isNotEmpty())
         @foreach ($comments as $data)
             <div class="post" id="comment_{{ $data->id }}">
@@ -36,7 +35,7 @@
 
                     @if (getUser())
                         <div class="float-right">
-                            @if (getUser('id') != $data->user_id)
+                            @if (getUser('id') !== $data->user_id)
                                 <a href="#" onclick="return postReply(this)" title="Ответить"><i class="fa fa-reply text-muted"></i></a>
 
                                 <a href="#" onclick="return postQuote(this)" title="Цитировать"><i class="fa fa-quote-right text-muted"></i></a>
@@ -44,7 +43,7 @@
                                 <a href="#" onclick="return sendComplaint(this)" data-type="{{ App\Models\Down::class }}" data-id="{{ $data->id }}" data-token="{{ $_SESSION['token'] }}" data-page="{{ $page->current }}" rel="nofollow" title="Жалоба"><i class="fa fa-bell text-muted"></i></a>
                             @endif
 
-                            @if (getUser('id') == $data->user->id && $data->created_at + 600 > SITETIME)
+                            @if ($data->created_at + 600 > SITETIME && getUser('id') === $data->user->id)
                                 <a href="/downs/edit/{{ $down->id }}/{{ $data->id }}?page={{ $page->current }}"><i class="fa fa-pencil-alt text-muted"></i></a>
                             @endif
 
@@ -88,7 +87,7 @@
         </div><br>
 
         <a href="/rules">Правила</a> /
-        <a href="/smiles">Смайлы</a> /
+        <a href="/stickers">Стикеры</a> /
         <a href="/tags">Теги</a><br><br>
     @else
         {!! showError('Для добавления сообщения необходимо авторизоваться') !!}

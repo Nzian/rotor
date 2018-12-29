@@ -2,11 +2,11 @@
 
 namespace App\Controllers;
 
-use App\Classes\Request;
 use App\Classes\Validator;
 use App\Models\Rating;
 use App\Models\User;
 use Illuminate\Database\Capsule\Manager as DB;
+use Illuminate\Http\Request;
 
 class RatingController extends BaseController
 {
@@ -24,17 +24,22 @@ class RatingController extends BaseController
 
     /**
      * Изменение рейтинга
+     *
+     * @param string    $login
+     * @param Request   $request
+     * @param Validator $validator
+     * @return string
      */
-    public function index($login)
+    public function index(string $login, Request $request, Validator $validator): string
     {
-        $vote = Request::input('vote');
+        $vote = $request->input('vote');
         $user = User::query()->where('login', $login)->first();
 
         if (! $user) {
             abort(404, 'Данного пользователя не существует!');
         }
 
-        if (getUser('id') == $user->id) {
+        if (getUser('id') === $user->id) {
             abort('default', 'Запрещено изменять репутацию самому себе!');
         }
 
@@ -53,16 +58,15 @@ class RatingController extends BaseController
             abort('default', 'Вы уже изменяли репутацию этому пользователю!');
         }
 
-        if (Request::isMethod('post')) {
+        if ($request->isMethod('post')) {
 
-            $token = check(Request::input('token'));
-            $text  = check(Request::input('text'));
+            $token = check($request->input('token'));
+            $text  = check($request->input('text'));
 
-            $validator = new Validator();
             $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
                 ->length($text, 5, 250, ['text' => 'Слишком длинный или короткий комментарий!']);
 
-            if (getUser('rating') < 10 && empty($vote)) {
+            if (empty($vote) && getUser('rating') < 10) {
                 $validator->addError('Уменьшать репутацию могут только пользователи с рейтингом 10 или выше!');
             }
 
@@ -79,20 +83,20 @@ class RatingController extends BaseController
                 ]);
 
                 if ($vote === 'plus') {
-                    $text = 'Пользователь [b]' . getUser('login') . '[/b] поставил вам плюс! (Ваш рейтинг: ' . ($user['rating'] + 1) . ')' . PHP_EOL . 'Комментарий: ' . $text;
+                    $text = 'Пользователь @' . getUser('login') . ' поставил вам плюс! (Ваш рейтинг: ' . ($user['rating'] + 1) . ')' . PHP_EOL . 'Комментарий: ' . $text;
 
                     $user->update([
-                        'rating'    => DB::raw('posrating - negrating + 1'),
-                        'posrating' => DB::raw('posrating + 1'),
+                        'rating'    => DB::connection()->raw('posrating - negrating + 1'),
+                        'posrating' => DB::connection()->raw('posrating + 1'),
                     ]);
 
                 } else {
 
-                    $text = 'Пользователь [b]' . getUser('login') . '[/b] поставил вам минус! (Ваш рейтинг: ' . ($user['rating'] - 1) . ')' . PHP_EOL . 'Комментарий: ' . $text;
+                    $text = 'Пользователь @' . getUser('login') . ' поставил вам минус! (Ваш рейтинг: ' . ($user['rating'] - 1) . ')' . PHP_EOL . 'Комментарий: ' . $text;
 
                     $user->update([
-                        'rating'    => DB::raw('posrating - negrating - 1'),
-                        'negrating' => DB::raw('negrating + 1'),
+                        'rating'    => DB::connection()->raw('posrating - negrating - 1'),
+                        'negrating' => DB::connection()->raw('negrating + 1'),
                     ]);
                 }
 
@@ -101,7 +105,7 @@ class RatingController extends BaseController
                 setFlash('success', 'Репутация успешно изменена!');
                 redirect('/users/'.$user->login);
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }
@@ -111,8 +115,11 @@ class RatingController extends BaseController
 
     /**
      *  Полученные голоса
+     *
+     * @param string $login
+     * @return string
      */
-    public function received($login)
+    public function received(string $login): string
     {
         $user = User::query()->where('login', $login)->first();
 
@@ -136,8 +143,11 @@ class RatingController extends BaseController
 
     /**
      *  Отданные голоса
+     *
+     * @param string $login
+     * @return string
      */
-    public function gave($login)
+    public function gave(string $login): string
     {
         $user = User::query()->where('login', $login)->first();
 
@@ -161,22 +171,30 @@ class RatingController extends BaseController
 
     /**
      *  Удаление истории
+     *
+     * @param Request   $request
+     * @param Validator $validator
+     * @return void
+     * @throws \Exception
      */
-    public function delete()
+    public function delete(Request $request, Validator $validator): void
     {
-        $id    = int(Request::input('id'));
-        $token = check(Request::input('token'));
+        $id    = int($request->input('id'));
+        $token = check($request->input('token'));
 
-        $validator = new Validator();
         $validator
-            ->true(Request::ajax(), 'Это не ajax запрос!')
+            ->true($request->ajax(), 'Это не ajax запрос!')
             ->true(isAdmin(User::ADMIN), 'Удалять рейтинг могут только администраторы')
             ->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
             ->notEmpty($id, ['Не выбрана запись для удаление!']);
 
         if ($validator->isValid()) {
 
-            Rating::query()->find($id)->delete();
+            $rating = Rating::query()->find($id);
+
+            if ($rating) {
+                $rating->delete();
+            }
 
             echo json_encode(['status' => 'success']);
         } else {

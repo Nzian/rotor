@@ -2,31 +2,36 @@
 
 namespace App\Controllers;
 
-use App\Classes\Request;
-use App\Models\Inbox;
+use App\Models\Message;
 use App\Models\Post;
 use App\Models\Topic;
 use App\Models\User;
+use Illuminate\Http\Request;
 
 class ApiController extends BaseController
 {
     /**
      * Главная страница
+     *
+     * @return string
      */
-    public function index()
+    public function index(): string
     {
         return view('api/index');
     }
 
     /**
      * Api пользователей
+     *
+     * @param Request $request
+     * @return void
      */
-    public function users()
+    public function users(Request $request): void
     {
         header('Content-type: application/json');
         header('Content-Disposition: inline; filename="users.json";');
 
-        $token = check(Request::input('token'));
+        $token = check($request->input('token'));
 
         if (! $token) {
             echo json_encode(['error' => 'no token']);
@@ -67,14 +72,17 @@ class ApiController extends BaseController
 
     /**
      * Api приватных сообщений
+     *
+     * @param Request $request
+     * @return void
      */
-    public function messages()
+    public function messages(Request $request): void
     {
         header('Content-type: application/json');
         header('Content-Disposition: inline; filename="messages.json";');
 
-        $token = check(Request::input('token'));
-        $count = int(Request::input('count', 10));
+        $token = check($request->input('token'));
+        $count = int($request->input('count', 10));
 
         if (! $token) {
             echo json_encode(['error' => 'no token']);
@@ -87,47 +95,53 @@ class ApiController extends BaseController
             exit();
         }
 
-        $inbox = Inbox::query()->where('user_id', $user->id)
-            ->orderBy('created_at')
+        $messages = Message::query()
+            ->where('user_id', $user->id)
+            ->where('type', 'in')
+            ->orderBy('created_at', 'desc')
             ->limit($count)
             ->get();
 
-        if ($inbox->isEmpty()) {
+        if ($messages->isEmpty()) {
             echo json_encode(['error' => 'no messages']);
             exit();
         }
 
-        $total = $inbox->count();
+        $total = $messages->count();
 
-        $messages = [];
-        foreach ($inbox as $data) {
+        $msg = [];
+        foreach ($messages as $data) {
 
             $data->text = bbCode($data->text);
 
-            $messages[] = [
+            $msg[] = [
                 'author_id'  => $data->author_id,
-                'login'      => $data->author->login,
+                'login'      => $data->author->id ? $data->author->login : 'Система',
                 'text'       => $data->text,
+                'reading'    => $data->reading,
                 'created_at' => $data->created_at,
             ];
         }
 
         echo json_encode([
             'total'    => $total,
-            'messages' => $messages
+            'messages' => $msg
         ]);
     }
 
     /**
      * Api постов темы в форуме
+     *
+     * @param Request $request
+     * @return void
      */
-    public function forums()
+    public function forums(Request $request): void
     {
         header('Content-type: application/json');
         header('Content-Disposition: inline; filename="forums.json";');
 
-        $token = check(Request::input('token'));
-        $id    = int(Request::input('id'));
+        $token = check($request->input('token'));
+        $id    = int($request->input('id'));
 
         if (! $token) {
             echo json_encode(['error' => 'no token']);
@@ -140,6 +154,7 @@ class ApiController extends BaseController
             exit();
         }
 
+        /** @var Topic $topic */
         $topic = Topic::query()->find($id);
         if (! $topic) {
             echo json_encode(['error' => 'no topic']);

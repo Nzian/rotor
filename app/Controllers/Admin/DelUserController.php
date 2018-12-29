@@ -2,9 +2,9 @@
 
 namespace App\Controllers\Admin;
 
-use App\Classes\Request;
 use App\Classes\Validator;
 use App\Models\User;
+use Illuminate\Http\Request;
 
 class DelUserController extends AdminController
 {
@@ -22,21 +22,24 @@ class DelUserController extends AdminController
 
     /**
      * Главная страница
+     *
+     * @param Request $request
+     * @return string
      */
-    public function index()
+    public function index(Request $request): string
     {
         $users  = collect();
-        $period = check(Request::input('period'));
-        $point  = check(Request::input('point'));
+        $period = check($request->input('period'));
+        $point  = check($request->input('point'));
 
-        if (Request::isMethod('post')) {
+        if ($request->isMethod('post')) {
 
             if ($period < 180) {
                 abort('default', 'Указанно недопустимое время для удаления!');
             }
 
             $users = User::query()
-                ->where('updated_at', '<', SITETIME - ($period * 24 * 3600))
+                ->where('updated_at', '<', strtotime('-' . $period . ' days', SITETIME))
                 ->where('point', '<=', $point)
                 ->get();
 
@@ -52,20 +55,23 @@ class DelUserController extends AdminController
 
     /**
      * Очистка пользователей
+     *
+     * @param Request   $request
+     * @param Validator $validator
+     * @return void
      */
-    public function clear()
+    public function clear(Request $request, Validator $validator): void
     {
-        $token  = check(Request::input('token'));
-        $period = check(Request::input('period'));
-        $point  = check(Request::input('point'));
+        $token  = check($request->input('token'));
+        $period = check($request->input('period'));
+        $point  = check($request->input('point'));
 
-        $validator = new Validator();
         $validator
             ->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
             ->gte($period, 180, 'Указанно недопустимое время для удаления!');
 
         $users = User::query()
-            ->where('updated_at', '<', SITETIME - ($period * 24 * 3600))
+            ->where('updated_at', '<', strtotime('-' . $period . ' days', SITETIME))
             ->where('point', '<=', $point)
             ->get();
 

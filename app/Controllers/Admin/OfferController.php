@@ -2,12 +2,12 @@
 
 namespace App\Controllers\Admin;
 
-use App\Classes\Request;
 use App\Classes\Validator;
 use App\Models\Comment;
 use App\Models\Offer;
 use App\Models\Polling;
 use App\Models\User;
+use Illuminate\Http\Request;
 
 class OfferController extends AdminController
 {
@@ -25,12 +25,16 @@ class OfferController extends AdminController
 
     /**
      * Главная страница
+     *
+     * @param string  $type
+     * @param Request $request
+     * @return string
      */
-    public function index($type = Offer::OFFER)
+    public function index(Request $request, $type = Offer::OFFER): string
     {
-        $otherType = $type == Offer::OFFER ? Offer::ISSUE : Offer::OFFER;
+        $otherType = $type === Offer::OFFER ? Offer::ISSUE : Offer::OFFER;
 
-        $sort = check(Request::input('sort'));
+        $sort = check($request->input('sort'));
 
         $total = Offer::query()->where('type', $type)->count();
         $page = paginate(setting('postoffers'), $total);
@@ -64,8 +68,11 @@ class OfferController extends AdminController
 
     /**
      * Просмотр записи
+     *
+     * @param int $id
+     * @return string
      */
-    public function view($id)
+    public function view(int $id): string
     {
         $offer = Offer::query()
             ->where('offers.id', $id)
@@ -80,8 +87,13 @@ class OfferController extends AdminController
 
     /**
      * Редактирование записи
+     *
+     * @param int       $id
+     * @param Request   $request
+     * @param Validator $validator
+     * @return string
      */
-    public function edit($id)
+    public function edit(int $id, Request $request, Validator $validator): string
     {
         $offer = Offer::query()->where('id', $id)->first();
 
@@ -89,15 +101,14 @@ class OfferController extends AdminController
             abort(404, 'Данного предложения или проблемы не существует!');
         }
 
-        if (Request::isMethod('post')) {
+        if ($request->isMethod('post')) {
 
-            $token  = check(Request::input('token'));
-            $title  = check(Request::input('title'));
-            $text   = check(Request::input('text'));
-            $type   = check(Request::input('type'));
-            $closed = empty(Request::input('closed')) ? 0 : 1;
+            $token  = check($request->input('token'));
+            $title  = check($request->input('title'));
+            $text   = check($request->input('text'));
+            $type   = check($request->input('type'));
+            $closed = empty($request->input('closed')) ? 0 : 1;
 
-            $validator = new Validator();
             $validator->equal($token, $_SESSION['token'], ['Неверный идентификатор сессии, повторите действие!'])
                 ->length($title, 5, 50, ['title' => 'Слишком длинный или короткий заголовок!'])
                 ->length($text, 5, 1000, ['text' => 'Слишком длинное или короткое описание!'])
@@ -119,7 +130,7 @@ class OfferController extends AdminController
                 setFlash('success', 'Запись успешно изменена!');
                 redirect('/admin/offers/' . $offer->id);
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }
@@ -129,8 +140,13 @@ class OfferController extends AdminController
 
     /**
      * Ответ на предложение
+     *
+     * @param int       $id
+     * @param Request   $request
+     * @param Validator $validator
+     * @return string
      */
-    public function reply($id)
+    public function reply(int $id, Request $request, Validator $validator): string
     {
         $offer = Offer::query()->where('id', $id)->first();
 
@@ -138,14 +154,13 @@ class OfferController extends AdminController
             abort(404, 'Данного предложения или проблемы не существует!');
         }
 
-        if (Request::isMethod('post')) {
+        if ($request->isMethod('post')) {
 
-            $token  = check(Request::input('token'));
-            $reply  = check(Request::input('reply'));
-            $status = check(Request::input('status'));
-            $closed = empty(Request::input('closed')) ? 0 : 1;
+            $token  = check($request->input('token'));
+            $reply  = check($request->input('reply'));
+            $status = check($request->input('status'));
+            $closed = empty($request->input('closed')) ? 0 : 1;
 
-            $validator = new Validator();
             $validator->equal($token, $_SESSION['token'], ['Неверный идентификатор сессии, повторите действие!'])
                 ->length($reply, 5, 3000, ['reply' => 'Слишком длинный или короткий текст ответа!'])
                 ->in($status, array_keys(Offer::STATUSES), ['status' => 'Недопустимый статус предложения или проблемы!']);
@@ -165,7 +180,7 @@ class OfferController extends AdminController
                 setFlash('success', 'Ответ успешно добавлен!');
                 redirect('/admin/offers/' . $offer->id);
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }
@@ -177,16 +192,19 @@ class OfferController extends AdminController
 
     /**
      * Пересчет комментариев
+     *
+     * @param Request $request
+     * @return void
      */
-    public function restatement()
+    public function restatement(Request $request): void
     {
         if (! isAdmin(User::BOSS)) {
             abort(403, 'Доступ запрещен!');
         }
 
-        $token = check(Request::input('token'));
+        $token = check($request->input('token'));
 
-        if ($token == $_SESSION['token']) {
+        if ($token === $_SESSION['token']) {
 
             restatement('offers');
 
@@ -200,15 +218,18 @@ class OfferController extends AdminController
 
     /**
      * Удаление записей
+     *
+     * @param Request   $request
+     * @param Validator $validator
+     * @return void
      */
-    public function delete()
+    public function delete(Request $request, Validator $validator): void
     {
-        $page  = int(Request::input('page', 1));
-        $token = check(Request::input('token'));
-        $del   = intar(Request::input('del'));
-        $type  = Request::input('type') == Offer::OFFER ? Offer::OFFER : Offer::ISSUE;
+        $page  = int($request->input('page', 1));
+        $token = check($request->input('token'));
+        $del   = intar($request->input('del'));
+        $type  = $request->input('type') === Offer::OFFER ? Offer::OFFER : Offer::ISSUE;
 
-        $validator = new Validator();
         $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
             ->true($del, 'Отсутствуют выбранные записи для удаления!');
 

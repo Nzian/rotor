@@ -2,8 +2,25 @@
 
 namespace App\Models;
 
+use App\Traits\UploadTrait;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+
+/**
+ * Class Photo
+ *
+ * @property int id
+ * @property int user_id
+ * @property string title
+ * @property string text
+ * @property int created_at
+ * @property int rating
+ * @property int closed
+ * @property int count_comments
+ */
 class Photo extends BaseModel
 {
+    use UploadTrait;
+
     /**
      * Indicates if the model should be timestamped.
      *
@@ -27,16 +44,20 @@ class Photo extends BaseModel
 
     /**
      * Возвращает комментарии фотографий
+     *
+     * @return MorphMany
      */
-    public function comments()
+    public function comments(): MorphMany
     {
         return $this->morphMany(Comment::class, 'relate');
     }
 
     /**
      * Возвращает загруженные файлы
+     *
+     * @return MorphMany
      */
-    public function files()
+    public function files(): MorphMany
     {
         return $this->morphMany(File::class, 'relate');
     }
@@ -47,7 +68,7 @@ class Photo extends BaseModel
      * @return bool|null
      * @throws \Exception
      */
-    public function delete()
+    public function delete(): ?bool
     {
         $this->files->each(function($file) {
             deleteFile(HOME . $file->hash);

@@ -5,15 +5,6 @@
 @stop
 
 @section('content')
-
-    @if (getUser() && ! $forum->closed)
-        <div class="float-right">
-            <a class="btn btn-success" href="/forums/create?fid={{ $forum->id }}">Создать тему</a>
-        </div><br>
-    @endif
-
-    <h1>{{ $forum->title }}</h1>
-
     <nav>
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="/"><i class="fas fa-home"></i></a></li>
@@ -31,7 +22,15 @@
         </ol>
     </nav>
 
-    @if ($forum->children->isNotEmpty() && $page->current == 1)
+    @if (! $forum->closed && getUser())
+        <div class="float-right">
+            <a class="btn btn-success" href="/forums/create?fid={{ $forum->id }}">Создать тему</a>
+        </div><br>
+    @endif
+
+    <h1>{{ $forum->title }}</h1>
+
+    @if ($forum->children->isNotEmpty() && $page->current === 1)
         <div class="act">
 
         @foreach ($forum->children as $child)
@@ -43,7 +42,7 @@
                 <div>
                     Тема: <a href="/topics/end/{{ $child->lastTopic->id }}">{{ $child->lastTopic->title }}</a><br>
                     @if ($child->lastTopic->lastPost->id)
-                        Сообщение: {!! $child->lastTopic->lastPost->user->getProfile(null, false) !!} ({{ dateFixed($child->lastTopic->lastPost->created_at) }})
+                        Сообщение: {{ $child->lastTopic->lastPost->user->getName() }} ({{ dateFixed($child->lastTopic->lastPost->created_at) }})
                     @endif
                 </div>
             @else
@@ -64,7 +63,7 @@
             <div>
                 @if ($topic->lastPost)
                     {!! $topic->pagination() !!}
-                    Сообщение: {!! $topic->lastPost->user->getProfile(null, false) !!} ({{ dateFixed($topic->lastPost->created_at) }})
+                    Сообщение: {{ $topic->lastPost->user->getName() }} ({{ dateFixed($topic->lastPost->created_at) }})
                 @endif
             </div>
         @endforeach

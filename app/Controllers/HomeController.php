@@ -2,27 +2,31 @@
 
 namespace App\Controllers;
 
-use App\Classes\Request;
 use App\Models\Ban;
 use Gregwar\Captcha\PhraseBuilder;
 use Gregwar\Captcha\CaptchaBuilder;
+use Illuminate\Http\Request;
 
 class HomeController extends BaseController
 {
     /**
      * Главная страница
+     *
+     * @return string
      */
-    public function index()
+    public function index(): string
     {
         return view('index');
     }
 
     /**
      * Закрытие сайта
+     *
+     * @return string
      */
-    public function closed()
+    public function closed(): string
     {
-        if (setting('closedsite') != 2) {
+        if (setting('closedsite') !== 2) {
             redirect('/');
         }
 
@@ -31,8 +35,12 @@ class HomeController extends BaseController
 
     /**
      * Бан по IP
+     *
+     * @param Request $request
+     * @return string
+     * @throws \Exception
      */
-    public function banip()
+    public function banip(Request $request): string
     {
         header($_SERVER['SERVER_PROTOCOL'].' 403 Forbidden');
 
@@ -41,7 +49,7 @@ class HomeController extends BaseController
             ->whereNull('user_id')
             ->first();
 
-        if (Request::isMethod('post')) {
+        if ($request->isMethod('post')) {
 
             if ($ban && captchaVerify()) {
 
@@ -59,8 +67,11 @@ class HomeController extends BaseController
 
     /**
      * Защитная картинка
+     *
+     * @return void
+     * @throws \Exception
      */
-    public function captcha()
+    public function captcha(): void
     {
         header('Content-type: image/jpeg');
         $phrase = new PhraseBuilder;
@@ -75,5 +86,15 @@ class HomeController extends BaseController
         $builder->build()->output();
 
         $_SESSION['protect'] = $builder->getPhrase();
+    }
+
+    /**
+     * Поиск по сайту
+     *
+     * @return string
+     */
+    public function search(): string
+    {
+        return view('search/index');
     }
 }

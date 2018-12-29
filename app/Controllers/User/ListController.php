@@ -2,16 +2,19 @@
 
 namespace App\Controllers\User;
 
-use App\Classes\Request;
 use App\Controllers\BaseController;
 use App\Models\User;
+use Illuminate\Http\Request;
 
 class ListController extends BaseController
 {
     /**
      * Список пользователей
+     *
+     * @param Request $request
+     * @return string
      */
-    public function userlist()
+    public function userlist(Request $request): string
     {
         $total = User::query()->count();
         $page = paginate(setting('userlist'), $total);
@@ -23,9 +26,9 @@ class ListController extends BaseController
             ->limit($page->limit)
             ->get();
 
-        $user = check(Request::input('user', getUser('login')));
+        $user = check($request->input('user', getUser('login')));
 
-        if (Request::isMethod('post')) {
+        if ($request->isMethod('post')) {
 
             $position = User::query()
                 ->orderBy('point', 'desc')
@@ -35,8 +38,8 @@ class ListController extends BaseController
                 ->keys()
                 ->first();
 
-            if (isset($position)) {
-                $position += 1;
+            if ($position) {
+                ++$position;
                 $end = ceil($position / $page->limit);
 
                 setFlash('success', 'Позиция в рейтинге: '.$position);
@@ -51,8 +54,10 @@ class ListController extends BaseController
 
     /**
      * Список админов
+     *
+     * @return string
      */
-    public function adminlist()
+    public function adminlist(): string
     {
         $users = User::query()
             ->whereIn('level', User::ADMIN_GROUPS)
@@ -64,8 +69,11 @@ class ListController extends BaseController
 
     /**
      * Рейтинг репутации
+     *
+     * @param Request $request
+     * @return string
      */
-    public function authoritylist()
+    public function authoritylist(Request $request): string
     {
         $total = User::query()->count();
         $page = paginate(setting('avtorlist'), $total);
@@ -77,9 +85,9 @@ class ListController extends BaseController
             ->limit($page->limit)
             ->get();
 
-        $user = check(Request::input('user', getUser('login')));
+        $user = check($request->input('user', getUser('login')));
 
-        if (Request::isMethod('post')) {
+        if ($request->isMethod('post')) {
 
             $position = User::query()
                 ->orderBy('rating', 'desc')
@@ -89,8 +97,8 @@ class ListController extends BaseController
                 ->keys()
                 ->first();
 
-            if (isset($position)) {
-                $position += 1;
+            if ($position) {
+                ++$position;
                 $end = ceil($position / $page->limit);
 
                 setFlash('success', 'Позиция в рейтинге: '.$position);
@@ -105,8 +113,11 @@ class ListController extends BaseController
 
     /**
      * Рейтинг толстосумов
+     *
+     * @param Request $request
+     * @return string
      */
-    public function ratinglist()
+    public function ratinglist(Request $request): string
     {
         $total = User::query()->count();
         $page = paginate(setting('userlist'), $total);
@@ -118,9 +129,9 @@ class ListController extends BaseController
             ->limit($page->limit)
             ->get();
 
-        $user = check(Request::input('user', getUser('login')));
+        $user = check($request->input('user', getUser('login')));
 
-        if (Request::isMethod('post')) {
+        if ($request->isMethod('post')) {
 
             $position = User::query()
                 ->orderBy('money', 'desc')
@@ -130,8 +141,8 @@ class ListController extends BaseController
                 ->keys()
                 ->first();
 
-            if (isset($position)) {
-                $position += 1;
+            if ($position) {
+                ++$position;
                 $end = ceil($position / $page->limit);
 
                 setFlash('success', 'Позиция в рейтинге: '.$position);

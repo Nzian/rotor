@@ -2,13 +2,12 @@
 
 namespace App\Controllers\Admin;
 
-use App\Classes\Request;
 use App\Classes\Validator;
 use App\Models\Down;
 use App\Models\File;
 use App\Models\Load;
 use App\Models\User;
-use Illuminate\Database\Capsule\Manager as DB;
+use Illuminate\Http\Request;
 
 class LoadController extends AdminController
 {
@@ -26,8 +25,10 @@ class LoadController extends AdminController
 
     /**
      * Главная страница
+     *
+     * @return string
      */
-    public function index()
+    public function index(): string
     {
         $categories = Load::query()
             ->where('parent_id', 0)
@@ -40,24 +41,28 @@ class LoadController extends AdminController
 
     /**
      * Создание раздела
+     *
+     * @param Request   $request
+     * @param Validator $validator
+     * @return void
      */
-    public function create()
+    public function create(Request $request, Validator $validator): void
     {
         if (! isAdmin(User::BOSS)) {
             abort(403, 'Доступ запрещен!');
         }
 
-        $token = check(Request::input('token'));
-        $name  = check(Request::input('name'));
+        $token = check($request->input('token'));
+        $name  = check($request->input('name'));
 
-        $validator = new Validator();
         $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
-            ->length($name, 5, 50, ['title' => 'Слишком длинное или короткое название раздела!']);
+            ->length($name, 3, 50, ['title' => 'Слишком длинное или короткое название раздела!']);
 
         if ($validator->isValid()) {
 
             $max = Load::query()->max('sort') + 1;
 
+            /** @var Load $load */
             $load = Load::query()->create([
                 'name' => $name,
                 'sort' => $max,
@@ -66,7 +71,7 @@ class LoadController extends AdminController
             setFlash('success', 'Новый раздел успешно создан!');
             redirect('/admin/loads/edit/' . $load->id);
         } else {
-            setInput(Request::all());
+            setInput($request->all());
             setFlash('danger', $validator->getErrors());
         }
 
@@ -75,13 +80,19 @@ class LoadController extends AdminController
 
     /**
      * Редактирование раздела
+     *
+     * @param int       $id
+     * @param Request   $request
+     * @param Validator $validator
+     * @return string
      */
-    public function edit($id)
+    public function edit(int $id, Request $request, Validator $validator): string
     {
         if (! isAdmin(User::BOSS)) {
             abort(403, 'Доступ запрещен!');
         }
 
+        /** @var Load $load */
         $load = Load::query()->with('children')->find($id);
 
         if (! $load) {
@@ -93,16 +104,15 @@ class LoadController extends AdminController
             ->orderBy('sort')
             ->get();
 
-        if (Request::isMethod('post')) {
-            $token  = check(Request::input('token'));
-            $parent = int(Request::input('parent'));
-            $name   = check(Request::input('name'));
-            $sort   = check(Request::input('sort'));
-            $closed = empty(Request::input('closed')) ? 0 : 1;
+        if ($request->isMethod('post')) {
+            $token  = check($request->input('token'));
+            $parent = int($request->input('parent'));
+            $name   = check($request->input('name'));
+            $sort   = check($request->input('sort'));
+            $closed = empty($request->input('closed')) ? 0 : 1;
 
-            $validator = new Validator();
             $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
-                ->length($name, 5, 50, ['title' => 'Слишком длинное или короткое название раздела!'])
+                ->length($name, 3, 50, ['title' => 'Слишком длинное или короткое название раздела!'])
                 ->notEqual($parent, $load->id, ['parent' => 'Недопустимый выбор родительского раздела!']);
 
             if (! empty($parent) && $load->children->isNotEmpty()) {
@@ -121,7 +131,7 @@ class LoadController extends AdminController
                 setFlash('success', 'Раздел успешно отредактирован!');
                 redirect('/admin/loads');
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }
@@ -131,22 +141,28 @@ class LoadController extends AdminController
 
     /**
      * Удаление раздела
+     *
+     * @param int       $id
+     * @param Request   $request
+     * @param Validator $validator
+     * @return void
+     * @throws \Exception
      */
-    public function delete($id)
+    public function delete(int $id, Request $request, Validator $validator): void
     {
         if (! isAdmin(User::BOSS)) {
             abort(403, 'Доступ запрещен!');
         }
 
+        /** @var Load $load */
         $load = Load::query()->with('children')->find($id);
 
         if (! $load) {
             abort(404, 'Данного раздела не существует!');
         }
 
-        $token = check(Request::input('token'));
+        $token = check($request->input('token'));
 
-        $validator = new Validator();
         $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
             ->true($load->children->isEmpty(), 'Удаление невозможно! Данный раздел имеет подразделы!');
 
@@ -169,16 +185,19 @@ class LoadController extends AdminController
 
     /**
      * Пересчет данных
+     *
+     * @param Request $request
+     * @return void
      */
-    public function restatement()
+    public function restatement(Request $request): void
     {
         if (! isAdmin(User::BOSS)) {
             abort(403, 'Доступ запрещен!');
         }
 
-        $token = check(Request::input('token'));
+        $token = check($request->input('token'));
 
-        if ($token == $_SESSION['token']) {
+        if ($token === $_SESSION['token']) {
 
             restatement('loads');
 
@@ -192,9 +211,14 @@ class LoadController extends AdminController
 
     /**
      * Просмотр загрузок раздела
+     *
+     * @param int     $id
+     * @param Request $request
+     * @return string
      */
-    public function load($id)
+    public function load(int $id, Request $request): string
     {
+        /** @var Load $category */
         $category = Load::query()->with('parent')->find($id);
 
         if (! $category) {
@@ -204,7 +228,7 @@ class LoadController extends AdminController
         $total = Down::query()->where('category_id', $category->id)->where('active', 1)->count();
         $page = paginate(setting('downlist'), $total);
 
-        $sort = check(Request::input('sort'));
+        $sort = check($request->input('sort'));
 
         switch ($sort) {
             case 'rated':
@@ -233,25 +257,31 @@ class LoadController extends AdminController
 
     /**
      * Редактирование загрузки
+     *
+     * @param int       $id
+     * @param Request   $request
+     * @param Validator $validator
+     * @return string
      */
-    public function editDown($id)
+    public function editDown(int $id, Request $request, Validator $validator): string
     {
+        /** @var Down $down */
         $down = Down::query()->find($id);
 
         if (! $down) {
             abort(404, 'Данного файла не существует!');
         }
 
-        if (Request::isMethod('post')) {
-            $token    = check(Request::input('token'));
-            $category = check(Request::input('category'));
-            $title    = check(Request::input('title'));
-            $text     = check(Request::input('text'));
-            $files    = (array) Request::file('files');
+        if ($request->isMethod('post')) {
+            $token    = check($request->input('token'));
+            $category = check($request->input('category'));
+            $title    = check($request->input('title'));
+            $text     = check($request->input('text'));
+            $files    = (array) $request->file('files');
 
+            /** @var Load $category */
             $category = Load::query()->find($category);
 
-            $validator = new Validator();
             $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
                 ->length($title, 5, 50, ['title' => 'Слишком длинное или короткое название!'])
                 ->length($text, 50, 5000, ['text' => 'Слишком длинное или короткое описание!'])
@@ -261,7 +291,7 @@ class LoadController extends AdminController
             $validator->empty($duplicate, ['title' => 'Загрузка с аналогичный названием уже существует!']);
 
             $existFiles = $down->files ? $down->files->count() : 0;
-            $validator->lte(count($files) + $existFiles, 5, ['files' => 'Разрешено загружать не более 5 файлов']);
+            $validator->lte(\count($files) + $existFiles, 5, ['files' => 'Разрешено загружать не более 5 файлов']);
 
             if ($validator->isValid()) {
 
@@ -303,7 +333,7 @@ class LoadController extends AdminController
                 setFlash('success', 'Загрузка успешно отредактирована!');
                 redirect('/admin/downs/edit/' . $down->id);
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }
@@ -319,10 +349,17 @@ class LoadController extends AdminController
 
     /**
      * Удаление загрузки
+     *
+     * @param int     $id
+     * @param Request $request
+     * @return void
+     * @throws \Exception
      */
-    public function deleteDown($id)
+    public function deleteDown(int $id, Request $request): void
     {
-        $token = check(Request::input('token'));
+        $token = check($request->input('token'));
+
+        /** @var Down $down */
         $down  = Down::query()->find($id);
 
         if (! $down) {
@@ -352,15 +389,22 @@ class LoadController extends AdminController
 
     /**
      * Удаление файла
+     *
+     * @param int $id
+     * @param int $fid
+     * @return void
+     * @throws \Exception
      */
-    public function deleteFile($id, $fid)
+    public function deleteFile(int $id, int $fid): void
     {
+        /** @var Down $down */
         $down = Down::query()->find($id);
 
         if (! $down) {
             abort(404, 'Файла не существует!');
         }
 
+        /** @var File $file */
         $file = File::query()->where('relate_id', $down->id)->find($fid);
 
         if (! $file) {
@@ -377,8 +421,10 @@ class LoadController extends AdminController
 
     /**
      * Новые публикации
+     *
+     * @return string
      */
-    public function new()
+    public function new(): string
     {
         $total = Down::query()->where('active', 0)->count();
         $page = paginate(setting('downlist'), $total);
@@ -396,11 +442,16 @@ class LoadController extends AdminController
 
     /**
      * Публикация загрузки
+     *
+     * @param int     $id
+     * @param Request $request
+     * @return void
      */
-    public function publish($id)
+    public function publish(int $id, Request $request): void
     {
-        $token = check(Request::input('token'));
+        /** @var Down $down */
         $down  = Down::query()->find($id);
+        $token = check($request->input('token'));
 
         if (! $down) {
             abort(404, 'Данного файла не существует!');
@@ -411,7 +462,7 @@ class LoadController extends AdminController
             $active = $down->active ^ 1;
 
             $down->update([
-                'active'    => $active,
+                'active'     => $active,
                 'updated_at' => SITETIME,
             ]);
 
@@ -419,14 +470,14 @@ class LoadController extends AdminController
                 $type = 'опубликована' ;
                 $down->category->increment('count_downs');
 
-                $text = 'Уведомеление о публикации файла.'.PHP_EOL.'Ваш файл <a href="/downs/'.$down->id.'">'.$down->title.'</a> успешно прошел проверку и добавлен в загрузки';
+                $text = 'Уведомеление о публикации файла.' . PHP_EOL . 'Ваш файл <a href="/downs/' . $down->id . '">' . $down->title . '</a> успешно прошел проверку и добавлен в загрузки';
                 $down->user->sendMessage(null, $text);
 
             } else {
                 $type = 'снята с публикации';
                 $down->category->decrement('count_downs');
 
-                $text = 'Уведомеление о снятии с публикации.'.PHP_EOL.'Ваш файл <a href="/downs/'.$down->id.'">'.$down->title.'</a> снят с публикации из загрузок';
+                $text = 'Уведомеление о снятии с публикации.' . PHP_EOL . 'Ваш файл <a href="/downs/' . $down->id . '">' . $down->title . '</a> снят с публикации из загрузок';
                 $down->user->sendMessage(null, $text);
             }
 

@@ -6,7 +6,6 @@ use App\Models\File;
 use App\Models\Load;
 use App\Models\User;
 use Exception;
-use App\Classes\Request;
 use App\Classes\Validator;
 use App\Controllers\BaseController;
 use App\Models\Comment;
@@ -16,6 +15,7 @@ use App\Models\Reader;
 use App\Models\Polling;
 use Illuminate\Database\Capsule\Manager as DB;
 use Illuminate\Database\Query\JoinClause;
+use Illuminate\Http\Request;
 use PhpZip\ZipFile;
 
 class DownController extends BaseController
@@ -26,13 +26,13 @@ class DownController extends BaseController
      * @param int $id
      * @return string
      */
-    public function index($id): string
+    public function index(int $id): string
     {
         $down = Down::query()
             ->select('downs.*', 'pollings.vote')
             ->where('downs.id', $id)
             ->leftJoin('pollings', function (JoinClause $join) {
-                $join->on('downs.id', '=', 'pollings.relate_id')
+                $join->on('downs.id', 'pollings.relate_id')
                     ->where('pollings.relate_type', Down::class)
                     ->where('pollings.user_id', getUser('id'));
             })
@@ -55,11 +55,14 @@ class DownController extends BaseController
     /**
      * Редактирование загрузки
      *
-     * @param int $id
+     * @param int       $id
+     * @param Request   $request
+     * @param Validator $validator
      * @return string
      */
-    public function edit($id): string
+    public function edit(int $id, Request $request, Validator $validator): string
     {
+        /** @var Down $down */
         $down = Down::query()->where('user_id', getUser('id'))->find($id);
 
         if (! $down) {
@@ -70,13 +73,12 @@ class DownController extends BaseController
             abort('default', 'Данный файл уже проверен модератором!');
         }
 
-        if (Request::isMethod('post')) {
-            $token = check(Request::input('token'));
-            $title = check(Request::input('title'));
-            $text  = check(Request::input('text'));
-            $files = (array) Request::file('files');
+        if ($request->isMethod('post')) {
+            $token = check($request->input('token'));
+            $title = check($request->input('title'));
+            $text  = check($request->input('text'));
+            $files = (array) $request->file('files');
 
-            $validator = new Validator();
             $validator->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
                 ->length($title, 5, 50, ['title' => 'Слишком длинное или короткое название!'])
                 ->length($text, 50, 5000, ['text' => 'Слишком длинное или короткое описание!']);
@@ -85,8 +87,8 @@ class DownController extends BaseController
             $validator->empty($duplicate, ['title' => 'Загрузка с аналогичный названием уже существует!']);
 
             $existFiles = $down->files ? $down->files->count() : 0;
-            $validator->notEmpty(count($files) + $existFiles, ['files' => 'Необходимо загрузить хотя бы 1 файл']);
-            $validator->lte(count($files) + $existFiles, setting('maxfiles'), ['files' => 'Разрешено загружать не более ' . setting('maxfiles') . ' файлов']);
+            $validator->notEmpty(\count($files) + $existFiles, ['files' => 'Необходимо загрузить хотя бы 1 файл']);
+            $validator->lte(\count($files) + $existFiles, setting('maxfiles'), ['files' => 'Разрешено загружать не более ' . setting('maxfiles') . ' файлов']);
 
             if ($validator->isValid()) {
 
@@ -115,7 +117,7 @@ class DownController extends BaseController
                 setFlash('success', 'Загрузка успешно отредактирована!');
                 redirect('/downs/' . $down->id);
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }
@@ -130,14 +132,16 @@ class DownController extends BaseController
      * @param int $fid
      * @throws Exception
      */
-    public function deleteFile($id, $fid): void
+    public function deleteFile(int $id, int $fid): void
     {
+        /** @var Down $down */
         $down = Down::query()->where('user_id', getUser('id'))->find($id);
 
         if (! $down) {
             abort(404, 'Файла не существует или вы не автор данной загрузки!');
         }
 
+        /** @var File $file */
         $file = File::query()->where('relate_id', $down->id)->find($fid);
 
         if (! $file) {
@@ -155,11 +159,13 @@ class DownController extends BaseController
     /**
      * Создание загрузки
      *
+     * @param Request   $request
+     * @param Validator $validator
      * @return string
      */
-    public function create(): string
+    public function create(Request $request, Validator $validator): string
     {
-        $cid = int(Request::input('cid'));
+        $cid = int($request->input('cid'));
 
         if (! setting('downupload')) {
             abort('default', 'Загрузка файлов запрещена администрацией сайта!');
@@ -179,16 +185,16 @@ class DownController extends BaseController
             abort('default', 'Разделы загрузок еще не созданы!');
         }
 
-        if (Request::isMethod('post')) {
+        if ($request->isMethod('post')) {
 
-            $token = check(Request::input('token'));
-            $title = check(Request::input('title'));
-            $text  = check(Request::input('text'));
-            $files = (array) Request::file('files');
+            $token = check($request->input('token'));
+            $title = check($request->input('title'));
+            $text  = check($request->input('text'));
+            $files = (array) $request->file('files');
 
+            /** @var Load $category */
             $category = Load::query()->find($cid);
 
-            $validator = new Validator();
             $validator
                 ->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
                 ->length($title, 5, 50, ['title' => 'Слишком длинное или короткое название!'])
@@ -204,7 +210,7 @@ class DownController extends BaseController
             }
 
             $validator->notEmpty($files, ['files' => 'Необходимо загрузить хотя бы 1 файл']);
-            $validator->lte(count($files), setting('maxfiles'), ['files' => 'Разрешено загружать не более ' . setting('maxfiles') . ' файлов']);
+            $validator->lte(\count($files), setting('maxfiles'), ['files' => 'Разрешено загружать не более ' . setting('maxfiles') . ' файлов']);
 
             if ($validator->isValid()) {
                 $rules = [
@@ -220,19 +226,23 @@ class DownController extends BaseController
 
             if ($validator->isValid()) {
 
+                /** @var Down $down */
                 $down = Down::query()->create([
                     'category_id' => $category->id,
                     'title'       => $title,
                     'text'        => $text,
                     'user_id'     => $user->id,
                     'created_at'  => SITETIME,
+                    'active'      => isAdmin(User::ADMIN),
                 ]);
 
                 foreach ($files as $file) {
-                    $down->uploadFile($file);
+                    $down->uploadAndConvertFile($file);
                 }
 
-                if (! isAdmin(User::ADMIN)) {
+                if (isAdmin(User::ADMIN)) {
+                    $down->category->increment('count_downs');
+                } else {
                     $admins = User::query()->whereIn('level', [User::BOSS, User::ADMIN])->get();
 
                     if ($admins->isNotEmpty()) {
@@ -247,7 +257,7 @@ class DownController extends BaseController
                 setFlash('success', 'Файл успешно загружен!');
                 redirect('/downs/' . $down->id);
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }
@@ -258,20 +268,23 @@ class DownController extends BaseController
     /**
      * Голосование
      *
-     * @param $id
+     * @param int       $id
+     * @param Request   $request
+     * @param Validator $validator
+     * @return void
      */
-    public function vote($id): void
+    public function vote(int $id, Request $request, Validator $validator): void
     {
-        $token = check(Request::input('token'));
-        $score = int(Request::input('score'));
+        $token = check($request->input('token'));
+        $score = int($request->input('score'));
 
+        /** @var Down $down */
         $down = Down::query()->find($id);
 
         if (! $down) {
             abort(404, 'Данного файла не существует!');
         }
 
-        $validator = new Validator();
         $validator
             ->equal($token, $_SESSION['token'], ['score' => 'Неверный идентификатор сессии, повторите действие!'])
             ->true(getUser(), ['score' => 'Для голосования необходимо авторизоваться!'])
@@ -306,8 +319,8 @@ class DownController extends BaseController
                 ]);
 
                 $down->update([
-                    'rating' => DB::raw('rating + ' . $score),
-                    'rated'  => DB::raw('rated + 1'),
+                    'rating' => DB::connection()->raw('rating + ' . $score),
+                    'rated'  => DB::connection()->raw('rated + 1'),
                 ]);
             }
 
@@ -322,10 +335,13 @@ class DownController extends BaseController
     /**
      * Скачивание файла
      *
-     * @param $id
+     * @param int       $id
+     * @param Validator $validator
+     * @return void
      */
-    public function download($id): void
+    public function download(int $id, Validator $validator): void
     {
+        /** @var File $file */
         $file = File::query()->where('relate_type', Down::class)->find($id);
 
         if (! $file || ! $file->relate) {
@@ -336,12 +352,9 @@ class DownController extends BaseController
             abort('default', 'Данный файл еще не проверен модератором!');
         }
 
-        $validator = new Validator();
-        $validator
-            ->true(file_exists(HOME . $file->hash), 'Файла для скачивания не существует!');
+        $validator->true(file_exists(HOME . $file->hash), 'Файла для скачивания не существует!');
 
         if ($validator->isValid()) {
-
             $reader = Reader::query()
                 ->where('relate_type', Down::class)
                 ->where('relate_id', $file->relate->id)
@@ -359,7 +372,7 @@ class DownController extends BaseController
                 $file->relate->increment('loads');
             }
 
-            redirect($file->hash);
+            $file->download();
         } else {
             setFlash('danger', $validator->getErrors());
             redirect('/downs/' . $file->relate->id);
@@ -369,11 +382,14 @@ class DownController extends BaseController
     /**
      * Комментарии
      *
-     * @param $id
+     * @param int       $id
+     * @param Request   $request
+     * @param Validator $validator
      * @return string
      */
-    public function comments($id): string
+    public function comments(int $id, Request $request, Validator $validator): string
     {
+        /** @var Down $down */
         $down = Down::query()->find($id);
 
         if (! $down) {
@@ -384,12 +400,11 @@ class DownController extends BaseController
             abort('default', 'Данный файл еще не проверен модератором!');
         }
 
-        if (Request::isMethod('post')) {
+        if ($request->isMethod('post')) {
 
-            $token = check(Request::input('token'));
-            $msg   = check(Request::input('msg'));
+            $token = check($request->input('token'));
+            $msg   = check($request->input('msg'));
 
-            $validator = new Validator();
             $validator
                 ->true(getUser(), 'Для добавления комментария необходимо авторизоваться!')
                 ->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
@@ -400,6 +415,7 @@ class DownController extends BaseController
 
                 $msg = antimat($msg);
 
+                /** @var Comment $comment */
                 $comment = Comment::query()->create([
                     'relate_type' => Down::class,
                     'relate_id'   => $down->id,
@@ -417,7 +433,7 @@ class DownController extends BaseController
                 setFlash('success', 'Комментарий успешно добавлен!');
                 redirect('/downs/end/' . $down->id);
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }
@@ -444,11 +460,13 @@ class DownController extends BaseController
     /**
      * Подготовка к редактированию комментария
      *
-     * @param int $id
-     * @param int $cid
+     * @param int       $id
+     * @param int       $cid
+     * @param Request   $request
+     * @param Validator $validator
      * @return string
      */
-    public function editComment($id, $cid): string
+    public function editComment(int $id, int $cid, Request $request, Validator $validator): string
     {
         $down = Down::query()->find($id);
 
@@ -456,7 +474,7 @@ class DownController extends BaseController
             abort(404, 'Данного файла не существует!');
         }
 
-        $page = int(Request::input('page', 1));
+        $page = int($request->input('page', 1));
 
         if (! getUser()) {
             abort(403, 'Для редактирования комментариев небходимо авторизоваться!');
@@ -476,12 +494,11 @@ class DownController extends BaseController
             abort('default', 'Редактирование невозможно, прошло более 10 минут!');
         }
 
-        if (Request::isMethod('post')) {
-            $token = check(Request::input('token'));
-            $msg   = check(Request::input('msg'));
-            $page  = int(Request::input('page', 1));
+        if ($request->isMethod('post')) {
+            $token = check($request->input('token'));
+            $msg   = check($request->input('msg'));
+            $page  = int($request->input('page', 1));
 
-            $validator = new Validator();
             $validator
                 ->equal($token, $_SESSION['token'], 'Неверный идентификатор сессии, повторите действие!')
                 ->length($msg, 5, 1000, ['msg' => 'Слишком длинный или короткий комментарий!']);
@@ -496,7 +513,7 @@ class DownController extends BaseController
                 setFlash('success', 'Комментарий успешно отредактирован!');
                 redirect('/downs/comments/' . $id . '?page=' . $page);
             } else {
-                setInput(Request::all());
+                setInput($request->all());
                 setFlash('danger', $validator->getErrors());
             }
         }
@@ -508,9 +525,11 @@ class DownController extends BaseController
      * Переадресация на последнюю страницу
      *
      * @param int $id
+     * @return void
      */
-    public function end($id): void
+    public function end(int $id): void
     {
+        /** @var Down $down */
         $down = Down::query()->find($id);
 
         if (! $down) {
@@ -532,8 +551,9 @@ class DownController extends BaseController
      * @param int $id
      * @return string
      */
-    public function zip($id): string
+    public function zip(int $id): string
     {
+        /** @var File $file */
         $file = File::query()->where('relate_type', Down::class)->find($id);
 
         if (! $file || ! $file->relate) {
@@ -551,25 +571,31 @@ class DownController extends BaseController
         try {
             $archive = new ZipFile();
             $archive->openFile(HOME . $file->hash);
+
+            $down         = $file->relate;
+            $page         = paginate(setting('ziplist'), $archive->count());
+            $getDocuments = array_values($archive->getAllInfo());
+
+            $viewExt   = Down::getViewExt();
+            $documents = \array_slice($getDocuments, $page->offset, $page->limit, true);
+
         } catch (Exception $e) {
             abort('default', 'Не удалось открыть архив!');
         }
-
-        $down         = $file->relate;
-        $page         = paginate(setting('ziplist'), $archive->count());
-        $getDocuments = array_values($archive->getAllInfo());
-
-        $viewExt   = Down::getViewExt();
-        $documents = array_slice($getDocuments, $page->offset, $page->limit, true);
 
         return view('loads/zip', compact('down', 'file', 'documents', 'page', 'viewExt'));
     }
 
     /**
      * Просмотр файла в zip архиве
+     *
+     * @param int $id
+     * @param int $fid
+     * @return string
      */
-    public function zipView($id, $fid)
+    public function zipView(int $id, int $fid): string
     {
+        /** @var File $file */
         $file = File::query()->where('relate_type', Down::class)->find($id);
 
         if (! $file || ! $file->relate) {
@@ -587,38 +613,31 @@ class DownController extends BaseController
         try {
             $archive = new ZipFile();
             $archive->openFile(HOME . $file->hash);
-        } catch (Exception $e) {
-            abort('default', 'Не удалось открыть архив!');
-        }
 
-        $getDocuments = array_values($archive->getAllInfo());
-        $document     = $getDocuments[$fid] ?? null;
+            /** @var ZipFile $archive */
+            $getDocuments = array_values($archive->getAllInfo());
+            $document     = $getDocuments[$fid] ?? null;
 
-        if (! $document) {
-            abort('default', 'Не удалось вывести содержимое файла');
-        }
-
-        try {
             $content = $archive[$document->getName()];
+
+            if ($document->getSize() > 0 && preg_match("/\.(gif|png|bmp|jpg|jpeg)$/", $document->getName())) {
+
+                $ext = getExtension($document->getName());
+
+                header('Content-type: image/' . $ext);
+                header('Content-Length: ' . \strlen($content));
+                header('Content-Disposition: inline; filename="' . $document->getName() . '";');
+                exit($content);
+            }
+
+            if (! isUtf($content)) {
+                $content = winToUtf($content);
+            }
+
+            $down = $file->relate;
         } catch (Exception $e) {
             abort('default', 'Не удалось прочитать файл!');
         }
-
-        if ($document->getSize() > 0 && preg_match("/\.(gif|png|bmp|jpg|jpeg)$/", $document->getName())) {
-
-            $ext = getExtension($document->getName());
-
-            header('Content-type: image/' . $ext);
-            header('Content-Length: ' . strlen($content));
-            header('Content-Disposition: inline; filename="' . $document->getName() . '";');
-            exit($content);
-        }
-
-        if (! isUtf($content)) {
-            $content = winToUtf($content);
-        }
-
-        $down = $file->relate;
 
         return view('loads/zip_view', compact('down', 'file', 'document', 'content'));
     }
@@ -629,7 +648,7 @@ class DownController extends BaseController
      * @param int $id
      * @return string
      */
-    public function rss($id): string
+    public function rss(int $id): string
     {
         $down = Down::query()->where('id', $id)->with('lastComments')->first();
 
@@ -645,9 +664,11 @@ class DownController extends BaseController
      *
      * @param int $id
      * @param int $cid
+     * @return void
      */
-    public function viewComment($id, $cid): void
+    public function viewComment(int $id, int $cid): void
     {
+        /** @var Down $down */
         $down = Down::query()->find($id);
 
         if (! $down) {

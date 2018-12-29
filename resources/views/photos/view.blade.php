@@ -22,7 +22,7 @@
        <a href="/admin/photos/delete/{{ $photo->id }}?token={{ $_SESSION['token'] }}" onclick="return confirm('Вы подтверждаете удаление изображения?')">Удалить</a>
     @endif
 
-    @if ($photo->user->id == getUser('id') && ! isAdmin())
+    @if ($photo->user->id === getUser('id') && ! isAdmin())
         <a href="/photos/edit/{{ $photo->id }}">Редактировать</a> /
         <a href="/photos/delete/{{ $photo->id }}?token={{ $_SESSION['token'] }}" onclick="return confirm('Вы подтверждаете удаление изображения?')">Удалить</a>
     @endif
@@ -37,13 +37,13 @@
         @endif
 
         <div class="js-rating">Рейтинг:
-            @unless (getUser('id') == $photo->user_id)
-                <a class="post-rating-down<?= $photo->vote == '-' ? ' active' : '' ?>" href="#" onclick="return changeRating(this);" data-id="{{ $photo->id }}" data-type="{{ App\Models\Photo::class }}" data-vote="-" data-token="{{ $_SESSION['token'] }}"><i class="fa fa-thumbs-down"></i></a>
-            @endunless
+            @if (getUser() && getUser('id') !== $photo->user_id)
+                <a class="post-rating-down<?= $photo->vote === '-' ? ' active' : '' ?>" href="#" onclick="return changeRating(this);" data-id="{{ $photo->id }}" data-type="{{ App\Models\Photo::class }}" data-vote="-" data-token="{{ $_SESSION['token'] }}"><i class="fa fa-thumbs-down"></i></a>
+            @endif
             <span>{!! formatNum($photo->rating) !!}</span>
-            @unless (getUser('id') == $photo->user_id)
-                <a class="post-rating-up<?= $photo->vote == '+' ? ' active' : '' ?>" href="#" onclick="return changeRating(this);" data-id="{{ $photo->id }}" data-type="{{ App\Models\Photo::class }}" data-vote="+" data-token="{{ $_SESSION['token'] }}"><i class="fa fa-thumbs-up"></i></a>
-            @endunless
+            @if (getUser() && getUser('id') !== $photo->user_id)
+                <a class="post-rating-up<?= $photo->vote === '+' ? ' active' : '' ?>" href="#" onclick="return changeRating(this);" data-id="{{ $photo->id }}" data-type="{{ App\Models\Photo::class }}" data-vote="+" data-token="{{ $_SESSION['token'] }}"><i class="fa fa-thumbs-up"></i></a>
+            @endif
         </div>
 
         Добавлено: {!! $photo->user->getProfile() !!} ({{ dateFixed($photo->created_at) }})<br>

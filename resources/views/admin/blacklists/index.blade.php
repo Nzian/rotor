@@ -16,17 +16,17 @@
         </ol>
     </nav>
 
-    <?php $active = ($type == 'email') ? 'success' : 'light'; ?>
+    <?php $active = ($type === 'email') ? 'success' : 'light'; ?>
     <a href="/admin/blacklists?type=email" class="badge badge-{{ $active }}">Email</a>
-    <?php $active = ($type == 'login') ? 'success' : 'light'; ?>
+    <?php $active = ($type === 'login') ? 'success' : 'light'; ?>
     <a href="/admin/blacklists?type=login" class="badge badge-{{ $active }}">Логины</a>
-    <?php $active = ($type == 'domain') ? 'success' : 'light'; ?>
+    <?php $active = ($type === 'domain') ? 'success' : 'light'; ?>
     <a href="/admin/blacklists?type=domain" class="badge badge-{{ $active }}">Домены</a>
     <br><br>
 
     @if ($lists->isNotEmpty())
 
-        <form action="/admin/blacklist/delete?type={{ $type }}&amp;page={{ $page->current }}" method="post">
+        <form action="/admin/blacklists/delete?type={{ $type }}&amp;page={{ $page->current }}" method="post">
             <input type="hidden" name="token" value="{{ $_SESSION['token'] }}">
 
             @foreach ($lists as $list)

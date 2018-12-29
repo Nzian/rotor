@@ -2,30 +2,51 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
+
+/**
+ * Class Offer
+ *
+ * @property int id
+ * @property string type
+ * @property string title
+ * @property string text
+ * @property int user_id
+ * @property int rating
+ * @property int created_at
+ * @property string status
+ * @property int count_comments
+ * @property int closed
+ * @property string reply
+ * @property int reply_user_id
+ * @property int updated_at
+ */
 class Offer extends BaseModel
 {
-    const DONE    = 'done';
-    const WAIT    = 'wait';
-    const CANCEL  = 'cancel';
-    const PROCESS = 'process';
+    public const DONE    = 'done';
+    public const WAIT    = 'wait';
+    public const CANCEL  = 'cancel';
+    public const PROCESS = 'process';
 
     /**
      * Статусы
      */
-    const STATUSES = [
+    public const STATUSES = [
         self::DONE    => 'Выполнено',
         self::WAIT    => 'Под вопросом',
         self::CANCEL  => 'Закрыто',
         self::PROCESS => 'В процессе',
     ];
 
-    const OFFER = 'offer';
-    const ISSUE = 'issue';
+    public const OFFER = 'offer';
+    public const ISSUE = 'issue';
 
     /**
      * Типы
      */
-    const TYPES = [
+    public const TYPES = [
         self::OFFER => 'Предложения',
         self::ISSUE => 'Проблемы',
     ];
@@ -47,16 +68,20 @@ class Offer extends BaseModel
 
     /**
      * Возвращает связь с голосованием
+     *
+     * @return morphOne
      */
-    public function polling()
+    public function polling(): morphOne
     {
         return $this->morphOne(Polling::class, 'relate')->where('user_id', getUser('id'));
     }
 
     /**
      * Возвращает связь пользователей
+     *
+     * @return BelongsTo
      */
-    public function replyUser()
+    public function replyUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'reply_user_id')->withDefault();
     }
@@ -65,9 +90,9 @@ class Offer extends BaseModel
      * Возвращает последнии комментарии
      *
      * @param int $limit
-     * @return mixed
+     * @return HasMany
      */
-    public function lastComments($limit = 15)
+    public function lastComments($limit = 15): HasMany
     {
         return $this->hasMany(Comment::class, 'relate_id')
             ->where('relate_type', self::class)
@@ -81,7 +106,7 @@ class Offer extends BaseModel
      *
      * @return string
      */
-    public function getStatus()
+    public function getStatus(): string
     {
         switch ($this->status) {
             case 'process':

@@ -2,8 +2,8 @@
 
 namespace App\Controllers\Admin;
 
-use App\Classes\Request;
 use App\Models\User;
+use Illuminate\Http\Request;
 
 class CacheController extends AdminController
 {
@@ -21,10 +21,13 @@ class CacheController extends AdminController
 
     /**
      * Главная страница
+     *
+     * @param Request $request
+     * @return string
      */
-    public function index()
+    public function index(Request $request): string
     {
-        $type = check(Request::input('type', 'files'));
+        $type = check($request->input('type', 'files'));
 
         if ($type === 'files') {
             $files = glob(STORAGE . '/temp/*.dat');
@@ -32,9 +35,9 @@ class CacheController extends AdminController
             $view = view('admin/caches/index', compact('files'));
         } else {
             $images = glob(UPLOADS.'/thumbnails/*.{gif,png,jpg,jpeg}', GLOB_BRACE);
-            $page   = paginate(20, count($images));
+            $page   = paginate(20, \count($images));
 
-            $images = array_slice($images, $page->offset, $page->limit);
+            $images = \array_slice($images, $page->offset, $page->limit);
 
             $view = view('admin/caches/images', compact('images', 'page'));
         }
@@ -44,13 +47,16 @@ class CacheController extends AdminController
 
     /**
      * Очистка кеша
+     *
+     * @param Request $request
+     * @return void
      */
-    public function clear()
+    public function clear(Request $request): void
     {
-        $token = check(Request::input('token'));
-        $type  = check(Request::input('type', 'files'));
+        $token = check($request->input('token'));
+        $type  = check($request->input('type', 'files'));
 
-        if ($token == $_SESSION['token']) {
+        if ($token === $_SESSION['token']) {
 
             if ($type === 'files') {
                 clearCache();

@@ -20,10 +20,10 @@
     Логин должен состоять только из знаков латинского алфавита и цифр, допустим знак дефиса!<br>
 
     @if (setting('regkeys'))
-        <i class="fa fa-pencil-alt text-muted"></i> <span style="color:#ff0000"><b>Включено подтверждение регистрации!</b> Вам на почтовый ящик будет выслан мастер-ключ, который необходим для подтверждения регистрации!</span><br>
+        <i class="fa fa-pencil-alt text-muted"></i> <span style="color:#ff0000"><b>Включено подтверждение регистрации!</b> Вам на почтовый ящик будет выслан код, который необходим для подтверждения регистрации!</span><br>
     @endif
 
-    @if (!empty(setting('invite')))
+    @if (setting('invite'))
         <i class="fa fa-pencil-alt text-muted"></i> <span style="color:#ff0000"><b>Включена регистрация по приглашениям!</b> Регистрация пользователей возможна только по специальным пригласительным ключам</span><br>
     @endif
 
@@ -40,7 +40,7 @@
     @endif
 
     <script src="//ulogin.ru/js/ulogin.js"></script>
-    <div class="mb-3" id="uLogin" data-ulogin="display=panel;fields=first_name,last_name,photo;optional=sex,email,nickname;providers=vkontakte,odnoklassniki,mailru,facebook,google,yandex,instagram;redirect_uri={{ siteUrl() }}%2Fregister">
+    <div class="mb-3" id="uLogin" data-ulogin="display=panel;fields=first_name,last_name,photo;optional=sex,email,nickname;providers=vkontakte,odnoklassniki,mailru,facebook,google,yandex,instagram;redirect_uri={{ siteUrl() }}/register;mobilebuttons=0;">
     </div>
 
     <div class="form">
@@ -50,7 +50,7 @@
                 <label for="inputLogin">Логин:</label>
                 <input class="form-control" name="login" id="inputLogin" maxlength="20" value="{{ getInput('login') }}" required>
                 {!! textError('login') !!}
-                <span class="text-muted font-italic">Только символы латинского алфавита и цифры</span>
+                <span class="text-muted font-italic">Только символы латинского алфавита, цифры и дефис</span>
             </div>
 
             <div class="form-group{{ hasError('password') }}">
@@ -84,11 +84,11 @@
             Пол:
             <div class="form-group{{ hasError('gender') }}">
                 <div class="custom-control custom-radio">
-                    <input class="custom-control-input" type="radio" id="inputGenderMale" name="gender" value="male"{{ $inputGender == 'male' ? ' checked' : '' }}>
+                    <input class="custom-control-input" type="radio" id="inputGenderMale" name="gender" value="male"{{ $inputGender === 'male' ? ' checked' : '' }}>
                     <label class="custom-control-label" for="inputGenderMale">Мужской</label>
                 </div>
                 <div class="custom-control custom-radio">
-                    <input class="custom-control-input" type="radio" id="inputGenderFemale" name="gender" value="female"{{ $inputGender == 'female' ? ' checked' : '' }}>
+                    <input class="custom-control-input" type="radio" id="inputGenderFemale" name="gender" value="female"{{ $inputGender === 'female' ? ' checked' : '' }}>
                     <label class="custom-control-label" for="inputGenderFemale">Женский</label>
                 </div>
                 {!! textError('gender') !!}
