@@ -27,16 +27,9 @@
     @if ($posts->isNotEmpty())
         @foreach ($posts as $data)
 
-            <div class="media post mb-2 p-1 bg-light">
-                <div class="mr-3 img">
-                    {!! $data->user->getAvatar() !!}
+            <div class="post">
+                <div class="b">
 
-                    @if ($data->user_id)
-                        {!! $data->user->getOnline() !!}
-                    @endif
-                </div>
-
-                <div class="media-body">
                     @if (getUser() && getUser('id') !== $data->user_id)
                         <div class="float-right">
                             <a href="#" onclick="return postReply(this)" data-toggle="tooltip" title="{{ trans('common.reply') }}"><i class="fa fa-reply text-muted"></i></a>
@@ -52,18 +45,21 @@
                         </div>
                     @endif
 
+                    <div class="img">
+                        {!! $data->user->getAvatar() !!}
+
+                        @if ($data->user_id)
+                            {!! $data->user->getOnline() !!}
+                        @endif
+                    </div>
+
                     @if ($data->user_id)
-                        <span>{!! $data->user->getProfile() !!}</span>
+                        <b>{!! $data->user->getProfile() !!}</b> <small>({{ dateFixed($data->created_at) }})</small><br>
                         {!! $data->user->getStatus() !!}
                     @else
-                        <span class="author" data-login="{{ setting('guestsuser') }}">{{ setting('guestsuser') }}</span>
+                        <b class="author" data-login="{{ setting('guestsuser') }}">{{ setting('guestsuser') }}</b> <small>({{ dateFixed($data->created_at) }})</small>
                     @endif
-
-                    <div class="text-muted post-date">{{ dateFixed($data->created_at) }}</div>
                 </div>
-            </div>
-
-            <div class="media-body mb-2">
 
                 <div class="message">{!! bbCode($data->text) !!}</div>
 
@@ -72,7 +68,7 @@
                 @endif
 
                 @if (isAdmin())
-                    <span class="data">{{ $data->brow }}, {{ $data->ip }}</span>
+                    <span class="data">({{ $data->brow }}, {{ $data->ip }})</span>
                 @endif
 
                 @if ($data->reply)
