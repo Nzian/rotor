@@ -16,11 +16,13 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Facade;
 use Illuminate\Translation\FileLoader;
 use Illuminate\Translation\Translator;
+use Illuminate\Validation\DatabasePresenceVerifier;
+use Illuminate\Validation\Factory as ValidationFactory;
 use Illuminate\View\Compilers\BladeCompiler;
 use Illuminate\View\Engines\CompilerEngine;
 use Illuminate\View\Engines\EngineResolver;
 use Illuminate\View\Engines\PhpEngine;
-use Illuminate\View\Factory;
+use Illuminate\View\Factory as ViewFactory;
 use Illuminate\View\FileViewFinder;
 use Whoops\Handler\PlainTextHandler;
 use Whoops\Handler\PrettyPageHandler;
@@ -122,7 +124,7 @@ $app->singleton('view', static function ($app) {
         ]
     );
 
-    return new Factory($resolver, $finder, $app['events']);
+    return new ViewFactory($resolver, $finder, $app['events']);
 });
 
 $app->singleton('log', static function ($app) {
@@ -130,7 +132,7 @@ $app->singleton('log', static function ($app) {
 });
 
 if (config('cache.default') === 'redis') {
-    $app->bind('redis', static function () use ($app) {
+    $app->bind('redis', static function ($app) {
         return new RedisManager($app, 'phpredis', config('database.redis'));
     });
 }
@@ -152,6 +154,14 @@ $db->addConnection(config('database.connections.' . config('database.default')))
 $db->setAsGlobal();
 $db->bootEloquent();
 $db::connection()->enableQueryLog();
+
+$app->singleton('validator', static function ($app) use ($db) {
+    $validation = new ValidationFactory($app['translator'], $app);
+    $presence = new DatabasePresenceVerifier($db->getDatabaseManager());
+    $validation->setPresenceVerifier($presence);
+
+    return $validation;
+});
 
 /**
  * Set $app as FacadeApplication handler

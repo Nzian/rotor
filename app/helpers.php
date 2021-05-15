@@ -41,6 +41,7 @@ use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\HtmlString;
+use Illuminate\Support\MessageBag;
 use Illuminate\Support\Str;
 use Intervention\Image\Constraint;
 use Intervention\Image\ImageManagerStatic as Image;
@@ -1728,6 +1729,36 @@ function redirect(string $url, bool $permanent = false)
  */
 function setFlash(string $status, $message)
 {
+    if ($message instanceof MessageBag) {
+        $messages = $message->toArray();
+
+
+/*        $key = 0;
+
+        if (is_array($error)) {
+            $key   = key($error);
+            $error = current($error);
+        }
+
+        if (isset($this->errors[$key])) {
+            $this->errors[] = trim($error . ' ' . $description);
+        } else {
+            $this->errors[$key] = trim($error . ' ' . $description);
+        }*/
+
+
+        $data = [];
+        foreach ($messages as $key => $values) {
+            foreach ($values as $value) {
+                $data[$key] = $value;
+            }
+
+        }
+
+        $message = $data;
+    }
+
+
     $_SESSION['flash'][$status] = $message;
 }
 
